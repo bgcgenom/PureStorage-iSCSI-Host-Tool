@@ -1,0 +1,27 @@
+# PowerShell artifacts
+*.ps1xml
+*.psc1
+*.pssc
+*.psrc
+*.clixml
+*.tmp
+*.bak
+
+# Logs and exports
+*.log
+Exports/
+Logs/
+
+# Local tool state / secrets
+arrays.dat
+arrays.json
+
+# OS/editor files
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# Packaging/build output
+dist/
+build/
