@@ -6,6 +6,21 @@ PowerShell/WPF utility for validating and configuring Windows Server hosts for P
 >
 > This is an independent community project and is not an official Pure Storage product.
 
+> [!WARNING]
+> ## Use at Your Own Risk
+>
+> This tool can make configuration changes to Windows Server hosts and Pure Storage arrays.
+>
+> Depending on the selected workflow, changes may include Windows iSCSI/MPIO settings, Microsoft DSM configuration, power-plan settings, Pure Storage host registration, IQN assignment, and host-group membership.
+>
+> Review all audit results, Dry Run output, Change Preview information, and confirmation prompts before applying changes.
+>
+> Test the tool in a non-production environment before using it in production. Use appropriate backups, change-control procedures, and recovery plans.
+>
+> The authors and contributors are not responsible for data loss, service interruption, outages, misconfiguration, loss of access, or other damages resulting from use or misuse of this software.
+>
+> This software is provided **"as is"**, without warranty of any kind. See the [MIT License](LICENSE) for the full license terms.
+
 ## What it does
 
 The tool provides a guided workflow for preparing Windows Server hosts and validating Pure Storage host registration before changes are applied.
@@ -53,7 +68,25 @@ The tool provides a guided workflow for preparing Windows Server hosts and valid
 
 The tool is intentionally scoped to Pure Storage host readiness and Pure host registration.
 
-It **does not**:
+### Changes the tool may make
+
+Depending on the selected workflow and operator confirmation, the tool may modify:
+
+- Windows iSCSI Initiator service configuration;
+- Windows Multipath-IO configuration;
+- Microsoft DSM registration for `PURE / FlashArray`;
+- global/default MPIO settings;
+- Pure-recommended MPIO timer settings;
+- Windows power-plan configuration;
+- Pure Storage host objects;
+- host IQN assignments;
+- Pure Storage host-group membership.
+
+Array-side changes are not performed silently. Review the Dry Run, Change Preview, and confirmation prompts before Apply.
+
+### Operations intentionally out of scope
+
+The tool **does not**:
 
 - create volumes;
 - connect or map LUNs;
@@ -171,32 +204,3 @@ PureStorage-iSCSI-Host-Tool/
     ├── TROUBLESHOOTING.md
     ├── SECURITY-SCOPE.md
     └── CHANGE-CHECKLIST.md
-```
-
-## Security notes
-
-- Run only from a trusted administrative workstation.
-- Use accounts authorized for the intended Windows and Pure Storage operations.
-- Review the Dry Run and Change Preview before Apply.
-- Keep exported infrastructure data and logs appropriately protected.
-- Do not place credentials, tokens, `PSCredential` objects, or local DPAPI files in the repository.
-
-## Roadmap
-
-Planned future work includes deeper Pure-aware per-device MPIO validation while retaining a clear separation between host-level defaults and device-level policy.
-
-The intended policy model is:
-
-- 1-10 paths per Pure device: Round Robin or Least Queue Depth supported; Round Robin preferred.
-- 11-32 paths: Least Queue Depth expected.
-- More than 32 paths: unsupported for Windows MPIO; report the condition and do not attempt to configure beyond the supported limit.
-
-Any future per-device policy changes will remain explicit: plan, confirm, apply, and revalidate. The tool will not add or remove paths to force compliance.
-
-## License
-
-Licensed under the [MIT License](LICENSE).
-
-## Disclaimer
-
-Use this tool in accordance with your organization's change-control, security, support, and testing requirements. Validate behavior in a non-production environment before broad deployment. This project is not affiliated with or supported by Pure Storage, Inc.
