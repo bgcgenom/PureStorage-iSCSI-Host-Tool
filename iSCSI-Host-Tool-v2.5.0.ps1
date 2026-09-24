@@ -3587,7 +3587,7 @@ function Test-IscsiConnectionPostVerification {
                 if ([int]$Device.PathCount -lt
                     [int]$RequiredMinimum) {
                     $Failures.Add(
-                        "$HostName: observed $($Device.PathCount) MPIO paths, below configured minimum $RequiredMinimum."
+                        "${HostName}: observed $($Device.PathCount) MPIO paths, below configured minimum $RequiredMinimum."
                     )
                 }
             }
