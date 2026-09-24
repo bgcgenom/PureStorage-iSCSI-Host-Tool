@@ -38,7 +38,7 @@ jobs:
           $Path = Join-Path $env:GITHUB_WORKSPACE 'iSCSI-Host-Tool-v2.5.0.ps1'
           $Raw = Get-Content -Path $Path -Raw
 
-          $Pattern = "(?s)\[xml\]\$Xaml\s*=\s*@'\r?\n(.*?)\r?\n'@"
+          $Pattern = '(?s)\[xml\]\$Xaml\s*=\s*@''\r?\n(.*?)\r?\n''@'
           $Match = [regex]::Match($Raw, $Pattern)
 
           if (-not $Match.Success) {
