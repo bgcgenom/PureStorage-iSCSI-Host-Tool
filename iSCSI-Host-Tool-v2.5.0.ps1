@@ -303,7 +303,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                             Padding="8"
                             Margin="0,0,0,8">
                         <TextBlock TextWrapping="Wrap">
-                            Host baseline: MSiSCSI Automatic/Running; Multipath-IO installed; PURE FlashArray registered with Microsoft DSM; Round Robin default; Pure MPIO timers; High Performance power plan. The tool does not configure target portals, iSCSI sessions, Pods, volumes, or LUN mappings.
+                            Host baseline: MSiSCSI Automatic/Running; Multipath-IO installed; PURE FlashArray registered with Microsoft DSM; Round Robin default; Pure MPIO timers; High Performance power plan. Target portals and iSCSI sessions are configured only from the dedicated iSCSI Connections tab. The tool does not create Pods, volumes, or LUN mappings.
                         </TextBlock>
                     </Border>
 
@@ -527,6 +527,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
                               CanUserAddRows="False"
+                              IsReadOnly="True"
                               SelectionMode="Single"
                               FrozenColumnCount="1"
                               HorizontalScrollBarVisibility="Auto"
@@ -676,7 +677,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                               VerticalScrollBarVisibility="Auto"
                               Margin="0,0,0,8">
                         <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="Use" Binding="{Binding Include}" Width="45"/>
+                            <DataGridCheckBoxColumn Header="Use" Binding="{Binding Include}" Width="45" IsReadOnly="False"/>
                             <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="125"/>
                             <DataGridTextColumn Header="Source IP" Binding="{Binding SourceIP}" Width="135"/>
                             <DataGridTextColumn Header="Array" Binding="{Binding Array}" Width="170"/>
@@ -714,6 +715,11 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                         <Button x:Name="IscsiExportButton"
                                 Content="Export CSV"
                                 Width="105"
+                                Height="30"
+                                Margin="0,0,8,0"/>
+                        <Button x:Name="IscsiRemoveMappingButton"
+                                Content="Remove Selected"
+                                Width="125"
                                 Height="30"/>
                     </StackPanel>
 
@@ -7569,7 +7575,7 @@ iSCSI HOST TOOL v2.5.0 - QUICK START
 9. Resolve blocked conflicts.
 10. Review Show Change Preview.
 11. Apply Pure registration only when the plan is correct.
-12. Open iSCSI Connections and add explicit Host / Source IP / Array / Target IP mappings.
+12. Open iSCSI Connections; select Host, discovered Source NIC/IP, connected Pure Array, and discovered Target Port/IP from the smart selectors, then add mappings.
 13. Run iSCSI Validate / Dry Run and review the change preview.
 14. Apply iSCSI Connections only when the plan is correct.
 15. Review iSCSI post-verification, including available Pure/MPIO runtime data.
@@ -7788,6 +7794,25 @@ if ($IscsiMinimumPathsTextBox) {
     $IscsiMinimumPathsTextBox.Add_TextChanged({
         Invalidate-IscsiValidationState `
             -Reason "Expected minimum path count changed"
+    })
+}
+
+if ($MainTabs) {
+    $MainTabs.Add_SelectionChanged({
+        try {
+            $SelectedTab = $MainTabs.SelectedItem
+
+            if ($SelectedTab -and
+                [string]$SelectedTab.Header -eq "iSCSI Connections") {
+                Refresh-IscsiSmartChoices
+                Update-IscsiControls
+            }
+        }
+        catch {
+            Write-ToolLog `
+                "Failed to refresh iSCSI smart choices: $($_.Exception.Message)" `
+                "WARN"
+        }
     })
 }
 
@@ -8913,5 +8938,6 @@ if ($HelpButton) {
     })
 }
 
+Refresh-IscsiSmartChoices
 Update-IscsiControls
 $null = $Window.ShowDialog()
