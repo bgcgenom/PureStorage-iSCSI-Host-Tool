@@ -1,0 +1,29 @@
+name: Validate PowerShell
+
+on:
+  push:
+    branches:
+      - feature/iscsi-connections-v2.5.0
+  workflow_dispatch:
+
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse iSCSI Host Tool v2.5.0
+        shell: powershell
+        run: |
+          $Errors = $null
+          $Tokens = $null
+          $Path = Join-Path $env:GITHUB_WORKSPACE 'iSCSI-Host-Tool-v2.5.0.ps1'
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $Path,
+              [ref]$Tokens,
+              [ref]$Errors
+          )
+          if ($Errors -and $Errors.Count -gt 0) {
+              $Errors | Format-List *
+              exit 1
+          }
+          Write-Host 'PowerShell parser check passed.'
