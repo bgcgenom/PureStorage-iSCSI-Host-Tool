@@ -2489,6 +2489,265 @@ function Reset-ToolSession {
 # iSCSI Connections phase
 # ------------------------------------------------------------
 
+function Get-IscsiHostChoices {
+    @(
+        $script:WindowsResults |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace([string]$_.Host)
+            } |
+            Sort-Object Host -Unique |
+            ForEach-Object {
+                [pscustomobject]@{
+                    Host    = [string]$_.Host
+                    Display = [string]$_.Host
+                }
+            }
+    )
+}
+
+function Get-IscsiArrayChoices {
+    @(
+        $script:PureArrayEntries |
+            Where-Object {
+                [string]$_.Status -eq "Connected"
+            } |
+            ForEach-Object {
+                $Identity =
+                    if (-not [string]::IsNullOrWhiteSpace([string]$_.ArrayName)) {
+                        [string]$_.ArrayName
+                    }
+                    else {
+                        [string]$_.Endpoint
+                    }
+
+                [pscustomobject]@{
+                    Identity = $Identity
+                    Endpoint = [string]$_.Endpoint
+                    Display  = $Identity
+                }
+            } |
+            Sort-Object Display
+    )
+}
+
+function Get-PureIscsiTargetChoices {
+    param([string]$ArrayIdentity)
+
+    $Context = Get-IscsiArrayContext -ArrayIdentity $ArrayIdentity
+
+    if (-not $Context) {
+        return @()
+    }
+
+    if (-not (Get-Command Get-Pfa2Port -ErrorAction SilentlyContinue)) {
+        throw "PureStoragePowerShellSDK2 does not expose Get-Pfa2Port."
+    }
+
+    $Rows = @()
+
+    foreach ($Port in @(Get-Pfa2Port -Array $Context.Array -ErrorAction Stop)) {
+        $Portal = ([string]$Port.Portal).Trim()
+        $Iqn = ([string]$Port.Iqn).Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Portal) -or
+            [string]::IsNullOrWhiteSpace($Iqn)) {
+            continue
+        }
+
+        $Address = $Portal
+        $PortNumber = 3260
+
+        if ($Portal -match '^\[(.+)\]:(\d+)$') {
+            $Address = [string]$Matches[1]
+            $PortNumber = [int]$Matches[2]
+        }
+        elseif ($Portal -match '^(.+):(\d+)$') {
+            $Address = [string]$Matches[1]
+            $PortNumber = [int]$Matches[2]
+        }
+
+        $PortName = [string]$Port.Name
+
+        $Display =
+            if (-not [string]::IsNullOrWhiteSpace($PortName)) {
+                "$Address - $PortName"
+            }
+            else {
+                $Address
+            }
+
+        $Rows += [pscustomobject]@{
+            IPAddress  = $Address
+            PortNumber = $PortNumber
+            IQN        = $Iqn
+            PortName   = $PortName
+            Display    = $Display
+        }
+    }
+
+    @(
+        $Rows |
+            Sort-Object IPAddress,PortName -Unique
+    )
+}
+
+function Refresh-IscsiHostChoices {
+    if (-not $IscsiHostComboBox) {
+        return
+    }
+
+    $Previous = [string]$IscsiHostComboBox.SelectedValue
+    $Choices = @(Get-IscsiHostChoices)
+    $IscsiHostComboBox.ItemsSource = $Choices
+
+    if ($Previous) {
+        $IscsiHostComboBox.SelectedValue = $Previous
+    }
+
+    if (-not $IscsiHostComboBox.SelectedItem -and
+        $Choices.Count -gt 0) {
+        $IscsiHostComboBox.SelectedIndex = 0
+    }
+}
+
+function Refresh-IscsiArrayChoices {
+    if (-not $IscsiArrayComboBox) {
+        return
+    }
+
+    $Previous = [string]$IscsiArrayComboBox.SelectedValue
+    $Choices = @(Get-IscsiArrayChoices)
+    $IscsiArrayComboBox.ItemsSource = $Choices
+
+    if ($Previous) {
+        $IscsiArrayComboBox.SelectedValue = $Previous
+    }
+
+    if (-not $IscsiArrayComboBox.SelectedItem -and
+        $Choices.Count -gt 0) {
+        $IscsiArrayComboBox.SelectedIndex = 0
+    }
+}
+
+function Refresh-IscsiSourceChoices {
+    if (-not $IscsiSourceComboBox) {
+        return
+    }
+
+    $IscsiSourceComboBox.ItemsSource = $null
+    $HostName = [string]$IscsiHostComboBox.SelectedValue
+
+    if ([string]::IsNullOrWhiteSpace($HostName)) {
+        return
+    }
+
+    try {
+        Set-GlobalStatus "Discovering enabled IPv4 interfaces on $HostName..."
+
+        $Inventory = Get-IscsiHostInventory -HostName $HostName
+
+        $Choices = @(
+            $Inventory.SourceAddresses |
+                Sort-Object InterfaceIndex,IPAddress |
+                ForEach-Object {
+                    [pscustomobject]@{
+                        IPAddress      = [string]$_.IPAddress
+                        InterfaceAlias = [string]$_.InterfaceAlias
+                        InterfaceIndex = [int]$_.InterfaceIndex
+                        Display        = "{0} - {1} - Up" -f
+                            [string]$_.IPAddress,
+                            [string]$_.InterfaceAlias
+                    }
+                }
+        )
+
+        $IscsiSourceComboBox.ItemsSource = $Choices
+
+        if ($Choices.Count -gt 0) {
+            $IscsiSourceComboBox.SelectedIndex = 0
+        }
+
+        Set-GlobalStatus "Discovered $($Choices.Count) enabled IPv4 interface(s) on $HostName."
+    }
+    catch {
+        Write-ToolLog `
+            "Failed to discover iSCSI source choices for ${HostName}: $($_.Exception.Message)" `
+            "ERROR"
+
+        [System.Windows.MessageBox]::Show(
+            "Unable to discover enabled IPv4 interfaces on ${HostName}.`n`n$($_.Exception.Message)",
+            "Source NIC Discovery",
+            "OK",
+            "Error"
+        ) | Out-Null
+    }
+}
+
+function Refresh-IscsiTargetChoices {
+    if (-not $IscsiTargetComboBox) {
+        return
+    }
+
+    $IscsiTargetComboBox.ItemsSource = $null
+    $IscsiTargetIqnTextBox.Text = ""
+
+    $ArrayIdentity = [string]$IscsiArrayComboBox.SelectedValue
+
+    if ([string]::IsNullOrWhiteSpace($ArrayIdentity)) {
+        return
+    }
+
+    try {
+        Set-GlobalStatus "Discovering Pure iSCSI target ports on $ArrayIdentity..."
+
+        $Choices = @(
+            Get-PureIscsiTargetChoices -ArrayIdentity $ArrayIdentity
+        )
+
+        $IscsiTargetComboBox.ItemsSource = $Choices
+
+        if ($Choices.Count -gt 0) {
+            $IscsiTargetComboBox.SelectedIndex = 0
+        }
+
+        Set-GlobalStatus "Discovered $($Choices.Count) iSCSI target port(s) on $ArrayIdentity."
+    }
+    catch {
+        Write-ToolLog `
+            "Failed to discover iSCSI target choices for ${ArrayIdentity}: $($_.Exception.Message)" `
+            "ERROR"
+
+        [System.Windows.MessageBox]::Show(
+            "Unable to discover Pure iSCSI target ports on ${ArrayIdentity}.`n`n$($_.Exception.Message)",
+            "Pure Target Discovery",
+            "OK",
+            "Error"
+        ) | Out-Null
+    }
+}
+
+function Update-IscsiTargetIqnPreview {
+    if (-not $IscsiTargetIqnTextBox) {
+        return
+    }
+
+    if ($IscsiTargetComboBox.SelectedItem) {
+        $IscsiTargetIqnTextBox.Text =
+            [string]$IscsiTargetComboBox.SelectedItem.IQN
+    }
+    else {
+        $IscsiTargetIqnTextBox.Text = ""
+    }
+}
+
+function Refresh-IscsiSmartChoices {
+    Refresh-IscsiHostChoices
+    Refresh-IscsiArrayChoices
+    Refresh-IscsiSourceChoices
+    Refresh-IscsiTargetChoices
+    Update-IscsiTargetIqnPreview
+}
+
 function New-IscsiMappingRow {
     param(
         [string]$HostName = "",
@@ -3932,70 +4191,6 @@ function Apply-IscsiConnections {
         "INFO"
 
     Test-IscsiConnectionPostVerification | Out-Null
-}
-
-function Show-IscsiHostNics {
-    $HostName = ""
-
-    if ($IscsiMappingGrid.SelectedItem) {
-        $HostName =
-            ([string]$IscsiMappingGrid.SelectedItem.Host).Trim()
-    }
-
-    if ([string]::IsNullOrWhiteSpace($HostName) -and
-        $WindowsResultsGrid.SelectedItem) {
-        $HostName =
-            ([string]$WindowsResultsGrid.SelectedItem.Host).Trim()
-    }
-
-    if ([string]::IsNullOrWhiteSpace($HostName)) {
-        [System.Windows.MessageBox]::Show(
-            "Select an iSCSI mapping row with a Host value, or select a Windows audit row first.",
-            "Select a Host",
-            "OK",
-            "Information"
-        ) | Out-Null
-        return
-    }
-
-    try {
-        $Inventory =
-            Get-IscsiHostInventory -HostName $HostName
-
-        $Lines =
-            New-Object System.Collections.Generic.List[string]
-
-        $Lines.Add("Enabled IPv4 interfaces on $HostName")
-        $Lines.Add("")
-
-        foreach ($Nic in @(
-            $Inventory.SourceAddresses |
-                Sort-Object InterfaceIndex,IPAddress
-        )) {
-            $Lines.Add(
-                "IP: $($Nic.IPAddress)    NIC: $($Nic.InterfaceAlias)    ifIndex: $($Nic.InterfaceIndex)"
-            )
-        }
-
-        if ($Inventory.SourceAddresses.Count -eq 0) {
-            $Lines.Add("No enabled IPv4 interfaces were returned.")
-        }
-
-        [System.Windows.MessageBox]::Show(
-            ($Lines -join [Environment]::NewLine),
-            "Host NIC Discovery - $HostName",
-            "OK",
-            "Information"
-        ) | Out-Null
-    }
-    catch {
-        [System.Windows.MessageBox]::Show(
-            "Unable to discover NICs on ${HostName}: $($_.Exception.Message)",
-            "Host NIC Discovery",
-            "OK",
-            "Error"
-        ) | Out-Null
-    }
 }
 
 function Export-IscsiConnectionResults {
@@ -7471,33 +7666,56 @@ $PreflightButton.Add_Click({
 })
 
 $IscsiAddMappingButton.Add_Click({
-    $HostName = ""
-    $ArrayName = ""
+    $HostName = [string]$IscsiHostComboBox.SelectedValue
+    $SourceIP = [string]$IscsiSourceComboBox.SelectedValue
+    $ArrayName = [string]$IscsiArrayComboBox.SelectedValue
+    $TargetIP = [string]$IscsiTargetComboBox.SelectedValue
 
-    if ($WindowsResultsGrid.SelectedItem) {
-        $HostName = [string]$WindowsResultsGrid.SelectedItem.Host
+    if ([string]::IsNullOrWhiteSpace($HostName) -or
+        [string]::IsNullOrWhiteSpace($SourceIP) -or
+        [string]::IsNullOrWhiteSpace($ArrayName) -or
+        [string]::IsNullOrWhiteSpace($TargetIP)) {
+        [System.Windows.MessageBox]::Show(
+            "Select a Host, Source NIC/IP, Pure Array, and Target Port/IP before adding the mapping.",
+            "Incomplete iSCSI Mapping",
+            "OK",
+            "Warning"
+        ) | Out-Null
+        return
     }
 
-    if ($FlashArrayGrid.SelectedItem) {
-        if (-not [string]::IsNullOrWhiteSpace(
-            [string]$FlashArrayGrid.SelectedItem.ArrayName
-        )) {
-            $ArrayName =
-                [string]$FlashArrayGrid.SelectedItem.ArrayName
-        }
-        else {
-            $ArrayName =
-                [string]$FlashArrayGrid.SelectedItem.Endpoint
-        }
-    }
-
-    $script:IscsiConnectionResults.Add(
-        (New-IscsiMappingRow `
-            -HostName $HostName `
-            -ArrayName $ArrayName)
+    $Existing = @(
+        $script:IscsiConnectionResults |
+            Where-Object {
+                [string]$_.Host -ieq $HostName -and
+                [string]$_.SourceIP -ieq $SourceIP -and
+                [string]$_.Array -ieq $ArrayName -and
+                [string]$_.TargetIP -ieq $TargetIP
+            }
     )
 
+    if ($Existing.Count -gt 0) {
+        [System.Windows.MessageBox]::Show(
+            "That exact Host / Source IP / Array / Target IP mapping already exists.",
+            "Duplicate Mapping",
+            "OK",
+            "Information"
+        ) | Out-Null
+        return
+    }
+
+    $Row = New-IscsiMappingRow `
+        -HostName $HostName `
+        -SourceIP $SourceIP `
+        -ArrayName $ArrayName `
+        -TargetIP $TargetIP
+
+    $Row.TargetIQN = [string]$IscsiTargetIqnTextBox.Text
+
+    $script:IscsiConnectionResults.Add($Row)
+
     Invalidate-IscsiValidationState -Reason "Mapping added"
+
     $IscsiMappingGrid.SelectedIndex =
         $script:IscsiConnectionResults.Count - 1
 
@@ -7520,8 +7738,20 @@ $IscsiRemoveMappingButton.Add_Click({
     }
 })
 
-$IscsiDiscoverNicsButton.Add_Click({
-    Show-IscsiHostNics
+$IscsiRefreshChoicesButton.Add_Click({
+    Refresh-IscsiSmartChoices
+})
+
+$IscsiHostComboBox.Add_SelectionChanged({
+    Refresh-IscsiSourceChoices
+})
+
+$IscsiArrayComboBox.Add_SelectionChanged({
+    Refresh-IscsiTargetChoices
+})
+
+$IscsiTargetComboBox.Add_SelectionChanged({
+    Update-IscsiTargetIqnPreview
 })
 
 $IscsiValidateButton.Add_Click({
@@ -7539,13 +7769,6 @@ $IscsiApplyButton.Add_Click({
 $IscsiExportButton.Add_Click({
     Export-IscsiConnectionResults
 })
-
-if ($IscsiMappingGrid) {
-    $IscsiMappingGrid.Add_CellEditEnding({
-        Invalidate-IscsiValidationState `
-            -Reason "Mapping edited"
-    })
-}
 
 if ($IscsiPersistentCheckBox) {
     $IscsiPersistentCheckBox.Add_Click({
