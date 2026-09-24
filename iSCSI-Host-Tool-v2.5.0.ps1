@@ -568,41 +568,102 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                     <GroupBox Grid.Row="1"
                               Header="Connection Settings"
                               Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Margin="8">
-                            <CheckBox x:Name="IscsiPersistentCheckBox"
-                                      Content="Persistent connections"
-                                      IsChecked="True"
-                                      VerticalAlignment="Center"
-                                      Margin="0,0,20,0"/>
-                            <CheckBox x:Name="IscsiMultipathCheckBox"
-                                      Content="Multipath enabled"
-                                      IsChecked="True"
-                                      VerticalAlignment="Center"
-                                      Margin="0,0,20,0"/>
-                            <TextBlock Text="Expected minimum paths (optional):"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,6,0"/>
-                            <TextBox x:Name="IscsiMinimumPathsTextBox"
-                                     Width="55"
-                                     Height="25"
-                                     VerticalContentAlignment="Center"
-                                     ToolTip="Leave blank to avoid enforcing an environment-specific minimum."/>
-                            <Separator Width="18" Opacity="0"/>
-                            <Button x:Name="IscsiAddMappingButton"
-                                    Content="Add Mapping"
-                                    Width="105"
-                                    Height="28"
-                                    Margin="0,0,8,0"/>
-                            <Button x:Name="IscsiRemoveMappingButton"
-                                    Content="Remove Mapping"
-                                    Width="115"
-                                    Height="28"
-                                    Margin="0,0,8,0"/>
-                            <Button x:Name="IscsiDiscoverNicsButton"
-                                    Content="Discover Host NICs"
-                                    Width="135"
-                                    Height="28"/>
-                        </StackPanel>
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0"
+                                        Orientation="Horizontal"
+                                        Margin="0,0,0,8">
+                                <CheckBox x:Name="IscsiPersistentCheckBox"
+                                          Content="Persistent connections"
+                                          IsChecked="True"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,20,0"/>
+                                <CheckBox x:Name="IscsiMultipathCheckBox"
+                                          Content="Multipath enabled"
+                                          IsChecked="True"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,20,0"/>
+                                <TextBlock Text="Expected minimum paths (optional):"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,6,0"/>
+                                <TextBox x:Name="IscsiMinimumPathsTextBox"
+                                         Width="55"
+                                         Height="25"
+                                         VerticalContentAlignment="Center"
+                                         ToolTip="Leave blank to avoid enforcing an environment-specific minimum."/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="225"/>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="235"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                    <TextBlock Text="Host" Margin="0,0,0,3"/>
+                                    <ComboBox x:Name="IscsiHostComboBox"
+                                              Height="26"
+                                              DisplayMemberPath="Display"
+                                              SelectedValuePath="Host"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                    <TextBlock Text="Source NIC / IP" Margin="0,0,0,3"/>
+                                    <ComboBox x:Name="IscsiSourceComboBox"
+                                              Height="26"
+                                              DisplayMemberPath="Display"
+                                              SelectedValuePath="IPAddress"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                                    <TextBlock Text="Pure Array" Margin="0,0,0,3"/>
+                                    <ComboBox x:Name="IscsiArrayComboBox"
+                                              Height="26"
+                                              DisplayMemberPath="Display"
+                                              SelectedValuePath="Identity"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="3" Margin="0,0,8,0">
+                                    <TextBlock Text="Target Port / IP" Margin="0,0,0,3"/>
+                                    <ComboBox x:Name="IscsiTargetComboBox"
+                                              Height="26"
+                                              DisplayMemberPath="Display"
+                                              SelectedValuePath="IPAddress"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="4" Margin="0,0,8,0">
+                                    <TextBlock Text="Target IQN" Margin="0,0,0,3"/>
+                                    <TextBox x:Name="IscsiTargetIqnTextBox"
+                                             Height="26"
+                                             IsReadOnly="True"
+                                             VerticalContentAlignment="Center"/>
+                                </StackPanel>
+
+                                <Button x:Name="IscsiAddMappingButton"
+                                        Grid.Column="5"
+                                        Content="Add Mapping"
+                                        Width="105"
+                                        Height="28"
+                                        VerticalAlignment="Bottom"
+                                        Margin="0,0,8,0"/>
+
+                                <Button x:Name="IscsiRefreshChoicesButton"
+                                        Grid.Column="6"
+                                        Content="Refresh"
+                                        Width="80"
+                                        Height="28"
+                                        VerticalAlignment="Bottom"/>
+                            </Grid>
+                        </Grid>
                     </GroupBox>
 
                     <DataGrid x:Name="IscsiMappingGrid"
@@ -814,9 +875,14 @@ $PureResultsGrid = $Window.FindName("PureResultsGrid")
 $IscsiPersistentCheckBox = $Window.FindName("IscsiPersistentCheckBox")
 $IscsiMultipathCheckBox = $Window.FindName("IscsiMultipathCheckBox")
 $IscsiMinimumPathsTextBox = $Window.FindName("IscsiMinimumPathsTextBox")
+$IscsiHostComboBox = $Window.FindName("IscsiHostComboBox")
+$IscsiSourceComboBox = $Window.FindName("IscsiSourceComboBox")
+$IscsiArrayComboBox = $Window.FindName("IscsiArrayComboBox")
+$IscsiTargetComboBox = $Window.FindName("IscsiTargetComboBox")
+$IscsiTargetIqnTextBox = $Window.FindName("IscsiTargetIqnTextBox")
 $IscsiAddMappingButton = $Window.FindName("IscsiAddMappingButton")
 $IscsiRemoveMappingButton = $Window.FindName("IscsiRemoveMappingButton")
-$IscsiDiscoverNicsButton = $Window.FindName("IscsiDiscoverNicsButton")
+$IscsiRefreshChoicesButton = $Window.FindName("IscsiRefreshChoicesButton")
 $IscsiMappingGrid = $Window.FindName("IscsiMappingGrid")
 $IscsiValidateButton = $Window.FindName("IscsiValidateButton")
 $IscsiPreviewButton = $Window.FindName("IscsiPreviewButton")
@@ -4478,7 +4544,7 @@ foreach ($Button in @(
         $AuditButton,$ConfigureButton,$RebootButton,
         $WindowsCredentialButton,$WindowsCurrentUserButton,$ClearWindowsButton,
         $AddPureArrayButton,$AboutButton,$ResetSessionButton,$ExportAllButton,$ViewLogButton,$PreflightButton,$RetestArrayButton,$RemoveArrayButton,$ValidatePureButton,$ReviewConflictButton,$ApplyPureButton,
-        $IscsiAddMappingButton,$IscsiRemoveMappingButton,$IscsiDiscoverNicsButton,$IscsiValidateButton,$IscsiPreviewButton,$IscsiApplyButton,$IscsiExportButton,
+        $IscsiAddMappingButton,$IscsiRemoveMappingButton,$IscsiRefreshChoicesButton,$IscsiValidateButton,$IscsiPreviewButton,$IscsiApplyButton,$IscsiExportButton,
         $CheckPrereqButton,$InstallPrereqButton
     )) {
         if ($Button) {
