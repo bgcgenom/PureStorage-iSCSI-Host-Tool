@@ -527,7 +527,6 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
                               CanUserAddRows="False"
-                              IsReadOnly="True"
                               SelectionMode="Single"
                               FrozenColumnCount="1"
                               HorizontalScrollBarVisibility="Auto"
