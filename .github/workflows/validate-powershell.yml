@@ -11,19 +11,59 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Parse iSCSI Host Tool v2.5.0
         shell: powershell
         run: |
           $Errors = $null
           $Tokens = $null
           $Path = Join-Path $env:GITHUB_WORKSPACE 'iSCSI-Host-Tool-v2.5.0.ps1'
+
           [void][System.Management.Automation.Language.Parser]::ParseFile(
               $Path,
               [ref]$Tokens,
               [ref]$Errors
           )
+
           if ($Errors -and $Errors.Count -gt 0) {
               $Errors | Format-List *
               exit 1
           }
+
           Write-Host 'PowerShell parser check passed.'
+
+      - name: Validate embedded XAML
+        shell: powershell
+        run: |
+          $Path = Join-Path $env:GITHUB_WORKSPACE 'iSCSI-Host-Tool-v2.5.0.ps1'
+          $Raw = Get-Content -Path $Path -Raw
+
+          $Pattern = "(?s)\[xml\]\$Xaml\s*=\s*@'\r?\n(.*?)\r?\n'@"
+          $Match = [regex]::Match($Raw, $Pattern)
+
+          if (-not $Match.Success) {
+              throw 'Embedded XAML here-string was not found.'
+          }
+
+          [xml]$XamlDocument = $Match.Groups[1].Value
+          Write-Host 'Embedded XAML XML parse passed.'
+
+          Add-Type -AssemblyName PresentationFramework
+          Add-Type -AssemblyName PresentationCore
+          Add-Type -AssemblyName WindowsBase
+
+          $Reader = New-Object System.Xml.XmlNodeReader $XamlDocument
+
+          try {
+              $Window = [Windows.Markup.XamlReader]::Load($Reader)
+              if (-not $Window) {
+                  throw 'XamlReader returned no Window object.'
+              }
+          }
+          finally {
+              if ($Reader) {
+                  $Reader.Close()
+              }
+          }
+
+          Write-Host 'WPF XAML load passed.'
