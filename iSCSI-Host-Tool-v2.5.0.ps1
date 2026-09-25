@@ -680,22 +680,73 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                               CanUserAddRows="False"
                               SelectionMode="Single"
                               FrozenColumnCount="1"
-                              HorizontalScrollBarVisibility="Visible"
+                              HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Auto"
                               ScrollViewer.CanContentScroll="True"
                               Margin="0,0,0,8">
+                        <DataGrid.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <Expander IsExpanded="False"
+                                                              Margin="0,2,0,2">
+                                                        <Expander.Header>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontWeight="Bold"
+                                                                           FontSize="13"/>
+                                                                <TextBlock Text="{Binding ItemCount, StringFormat=  ({0} connections)}"
+                                                                           Margin="6,0,0,0"
+                                                                           Foreground="Gray"/>
+                                                            </StackPanel>
+                                                        </Expander.Header>
+                                                        <ItemsPresenter Margin="16,2,0,4"/>
+                                                    </Expander>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <Expander IsExpanded="False"
+                                                              Margin="0,1,0,1">
+                                                        <Expander.Header>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontWeight="SemiBold"/>
+                                                                <TextBlock Text="{Binding ItemCount, StringFormat=  ({0} paths)}"
+                                                                           Margin="6,0,0,0"
+                                                                           Foreground="Gray"/>
+                                                            </StackPanel>
+                                                        </Expander.Header>
+                                                        <ItemsPresenter Margin="16,2,0,4"/>
+                                                    </Expander>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </DataGrid.GroupStyle>
                         <DataGrid.Columns>
                             <DataGridCheckBoxColumn Header="Use" Binding="{Binding Include}" Width="45" IsReadOnly="False"/>
-                            <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="125"/>
                             <DataGridTextColumn Header="Source IP" Binding="{Binding SourceIP}" Width="135"/>
-                            <DataGridTextColumn Header="Array" Binding="{Binding Array}" Width="170"/>
                             <DataGridTextColumn Header="Target IP" Binding="{Binding TargetIP}" Width="135"/>
                             <DataGridTextColumn Header="Target IQN" Binding="{Binding TargetIQN}" Width="285" IsReadOnly="True"/>
                             <DataGridTextColumn Header="TCP/3260" Binding="{Binding TCP3260}" Width="90" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Portal" Binding="{Binding PortalState}" Width="90" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Session" Binding="{Binding SessionState}" Width="90" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="185" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="420" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="*" MinWidth="260" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
 
@@ -737,7 +788,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                             Padding="8">
                         <TextBlock x:Name="IscsiSummaryText"
                                    TextWrapping="Wrap"
-                                   Text="Recommended workflow: Build Recommended Plan, review/edit or uncheck rows, then Validate / Dry Run. The planner uses same-subnet host/Pure target discovery only; manual selectors remain available for exceptions. Existing correct portals and sessions are MATCH and are not recreated."/>
+                                   Text="Recommended workflow: Build Recommended Plan, expand a host and then an array to review its paths, edit or uncheck rows as needed, then Validate / Dry Run. The planner uses same-subnet host/Pure target discovery only; manual selectors remain available for exceptions. Existing correct portals and sessions are MATCH and are not recreated."/>
                     </Border>
                 </Grid>
             </TabItem>
@@ -919,7 +970,30 @@ $PureResultsGrid.ItemsSource = $script:PureResults
 $FlashArrayGrid.ItemsSource = $script:PureArrayEntries
 
 $script:IscsiConnectionResults = New-Object System.Collections.ObjectModel.ObservableCollection[object]
-$IscsiMappingGrid.ItemsSource = $script:IscsiConnectionResults
+$script:IscsiConnectionView = [System.Windows.Data.CollectionViewSource]::GetDefaultView(
+    $script:IscsiConnectionResults
+)
+$script:IscsiConnectionView.GroupDescriptions.Clear()
+$script:IscsiConnectionView.GroupDescriptions.Add(
+    (New-Object System.Windows.Data.PropertyGroupDescription("Host"))
+)
+$script:IscsiConnectionView.GroupDescriptions.Add(
+    (New-Object System.Windows.Data.PropertyGroupDescription("Array"))
+)
+$script:IscsiConnectionView.SortDescriptions.Clear()
+$script:IscsiConnectionView.SortDescriptions.Add(
+    (New-Object System.ComponentModel.SortDescription("Host","Ascending"))
+)
+$script:IscsiConnectionView.SortDescriptions.Add(
+    (New-Object System.ComponentModel.SortDescription("Array","Ascending"))
+)
+$script:IscsiConnectionView.SortDescriptions.Add(
+    (New-Object System.ComponentModel.SortDescription("SourceIP","Ascending"))
+)
+$script:IscsiConnectionView.SortDescriptions.Add(
+    (New-Object System.ComponentModel.SortDescription("TargetIP","Ascending"))
+)
+$IscsiMappingGrid.ItemsSource = $script:IscsiConnectionView
 
 $script:PrereqResults = New-Object System.Collections.ObjectModel.ObservableCollection[object]
 $PrereqGrid.ItemsSource = $script:PrereqResults
