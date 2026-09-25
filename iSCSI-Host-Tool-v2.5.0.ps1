@@ -656,12 +656,20 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                                         VerticalAlignment="Bottom"
                                         Margin="0,0,8,0"/>
 
-                                <Button x:Name="IscsiRefreshChoicesButton"
-                                        Grid.Column="6"
-                                        Content="Refresh"
-                                        Width="80"
-                                        Height="28"
-                                        VerticalAlignment="Bottom"/>
+                                <StackPanel Grid.Column="6"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Bottom">
+                                    <Button x:Name="IscsiBuildPlanButton"
+                                            Content="Build Recommended Plan"
+                                            Width="175"
+                                            Height="28"
+                                            Margin="0,0,8,0"
+                                            ToolTip="Read-only discovery. Builds an editable same-subnet iSCSI mapping proposal across audited hosts and connected Pure arrays."/>
+                                    <Button x:Name="IscsiRefreshChoicesButton"
+                                            Content="Refresh"
+                                            Width="80"
+                                            Height="28"/>
+                                </StackPanel>
                             </Grid>
                         </Grid>
                     </GroupBox>
@@ -728,7 +736,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                             Padding="8">
                         <TextBlock x:Name="IscsiSummaryText"
                                    TextWrapping="Wrap"
-                                   Text="Add explicit host/source/array/target mappings, then run Validate / Dry Run. Existing correct portals and sessions are MATCH and are not recreated."/>
+                                   Text="Recommended workflow: Build Recommended Plan, review/edit or uncheck rows, then Validate / Dry Run. The planner uses same-subnet host/Pure target discovery only; manual selectors remain available for exceptions. Existing correct portals and sessions are MATCH and are not recreated."/>
                     </Border>
                 </Grid>
             </TabItem>
@@ -887,6 +895,7 @@ $IscsiTargetComboBox = $Window.FindName("IscsiTargetComboBox")
 $IscsiTargetIqnTextBox = $Window.FindName("IscsiTargetIqnTextBox")
 $IscsiAddMappingButton = $Window.FindName("IscsiAddMappingButton")
 $IscsiRemoveMappingButton = $Window.FindName("IscsiRemoveMappingButton")
+$IscsiBuildPlanButton = $Window.FindName("IscsiBuildPlanButton")
 $IscsiRefreshChoicesButton = $Window.FindName("IscsiRefreshChoicesButton")
 $IscsiMappingGrid = $Window.FindName("IscsiMappingGrid")
 $IscsiValidateButton = $Window.FindName("IscsiValidateButton")
@@ -2657,6 +2666,7 @@ function Refresh-IscsiSourceChoices {
                 ForEach-Object {
                     [pscustomobject]@{
                         IPAddress      = [string]$_.IPAddress
+                        PrefixLength   = [int]$_.PrefixLength
                         InterfaceAlias = [string]$_.InterfaceAlias
                         InterfaceIndex = [int]$_.InterfaceIndex
                         Display        = "{0} - {1} - Up" -f
@@ -3039,6 +3049,7 @@ function Get-IscsiHostInventory {
                 if ($Adapter -and $Adapter.Status -eq "Up") {
                     $Out.SourceAddresses += [pscustomobject]@{
                         IPAddress      = [string]$Ip.IPAddress
+                        PrefixLength   = [int]$Ip.PrefixLength
                         InterfaceAlias = [string]$Ip.InterfaceAlias
                         InterfaceIndex = [int]$Ip.InterfaceIndex
                         Status         = [string]$Adapter.Status
@@ -4744,7 +4755,7 @@ foreach ($Button in @(
         $AuditButton,$ConfigureButton,$RebootButton,
         $WindowsCredentialButton,$WindowsCurrentUserButton,$ClearWindowsButton,
         $AddPureArrayButton,$AboutButton,$ResetSessionButton,$ExportAllButton,$ViewLogButton,$PreflightButton,$RetestArrayButton,$RemoveArrayButton,$ValidatePureButton,$ReviewConflictButton,$ApplyPureButton,
-        $IscsiAddMappingButton,$IscsiRemoveMappingButton,$IscsiRefreshChoicesButton,$IscsiValidateButton,$IscsiPreviewButton,$IscsiApplyButton,$IscsiExportButton,
+        $IscsiAddMappingButton,$IscsiRemoveMappingButton,$IscsiBuildPlanButton,$IscsiRefreshChoicesButton,$IscsiValidateButton,$IscsiPreviewButton,$IscsiApplyButton,$IscsiExportButton,
         $CheckPrereqButton,$InstallPrereqButton
     )) {
         if ($Button) {
