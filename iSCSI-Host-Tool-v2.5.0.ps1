@@ -563,10 +563,10 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                     <TextBlock Grid.Row="0"
                                Margin="0,0,0,8"
                                TextWrapping="Wrap"
-                               Text="Define explicit Windows iSCSI source/target mappings. The tool does not assume NIC names, target counts, site topology, path counts, or that every host connects to every target."/>
+                               Text="Build a recommended iSCSI topology from audited hosts and connected Pure arrays, or add manual exceptions. Target IQNs are resolved automatically from the selected Pure target."/>
 
                     <GroupBox Grid.Row="1"
-                              Header="Connection Settings"
+                              Header="iSCSI Plan Settings"
                               Margin="0,0,0,8">
                         <Grid Margin="8">
                             <Grid.RowDefinitions>
@@ -603,7 +603,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                                     <ColumnDefinition Width="225"/>
                                     <ColumnDefinition Width="180"/>
                                     <ColumnDefinition Width="235"/>
-                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
@@ -640,36 +640,28 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                                               SelectedValuePath="IPAddress"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="4" Margin="0,0,8,0">
-                                    <TextBlock Text="Target IQN" Margin="0,0,0,3"/>
-                                    <TextBox x:Name="IscsiTargetIqnTextBox"
-                                             Height="26"
-                                             IsReadOnly="True"
-                                             VerticalContentAlignment="Center"/>
-                                </StackPanel>
-
                                 <Button x:Name="IscsiAddMappingButton"
-                                        Grid.Column="5"
+                                        Grid.Column="4"
                                         Content="Add Mapping"
                                         Width="105"
                                         Height="28"
                                         VerticalAlignment="Bottom"
-                                        Margin="0,0,8,0"/>
-
-                                <StackPanel Grid.Column="6"
-                                            Orientation="Horizontal"
-                                            VerticalAlignment="Bottom">
-                                    <Button x:Name="IscsiBuildPlanButton"
-                                            Content="Build Recommended Plan"
-                                            Width="175"
-                                            Height="28"
-                                            Margin="0,0,8,0"
-                                            ToolTip="Read-only discovery. Builds an editable same-subnet iSCSI mapping proposal across audited hosts and connected Pure arrays."/>
-                                    <Button x:Name="IscsiRefreshChoicesButton"
-                                            Content="Refresh"
-                                            Width="80"
-                                            Height="28"/>
-                                </StackPanel>
+                                        Margin="0,0,8,0"
+                                        ToolTip="Adds the selected host/source/array/target mapping. Target IQN is resolved automatically from the selected Pure target."/>
+                                <Button x:Name="IscsiBuildPlanButton"
+                                        Grid.Column="5"
+                                        Content="Build Recommended Plan"
+                                        Width="175"
+                                        Height="28"
+                                        VerticalAlignment="Bottom"
+                                        Margin="0,0,8,0"
+                                        ToolTip="Read-only discovery. Builds an editable same-subnet iSCSI mapping proposal across audited hosts and connected Pure arrays."/>
+                                <Button x:Name="IscsiRefreshChoicesButton"
+                                        Grid.Column="6"
+                                        Content="Refresh"
+                                        Width="80"
+                                        Height="28"
+                                        VerticalAlignment="Bottom"/>
                             </Grid>
                         </Grid>
                     </GroupBox>
@@ -720,12 +712,18 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                                                     <Expander IsExpanded="False"
                                                               Margin="0,1,0,1">
                                                         <Expander.Header>
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <TextBlock Text="{Binding Name}"
-                                                                           FontWeight="SemiBold"/>
-                                                                <TextBlock Text="{Binding ItemCount, StringFormat=  ({0} paths)}"
-                                                                           Margin="6,0,0,0"
-                                                                           Foreground="Gray"/>
+                                                            <StackPanel>
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding Name}"
+                                                                               FontWeight="SemiBold"/>
+                                                                    <TextBlock Text="{Binding ItemCount, StringFormat=  ({0} paths)}"
+                                                                               Margin="6,0,0,0"
+                                                                               Foreground="Gray"/>
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding Items[0].TargetIQN, StringFormat=IQN: {0}}"
+                                                                           Margin="16,1,0,0"
+                                                                           Foreground="Gray"
+                                                                           FontSize="11"/>
                                                             </StackPanel>
                                                         </Expander.Header>
                                                         <ItemsPresenter Margin="16,2,0,4"/>
@@ -942,7 +940,6 @@ $IscsiHostComboBox = $Window.FindName("IscsiHostComboBox")
 $IscsiSourceComboBox = $Window.FindName("IscsiSourceComboBox")
 $IscsiArrayComboBox = $Window.FindName("IscsiArrayComboBox")
 $IscsiTargetComboBox = $Window.FindName("IscsiTargetComboBox")
-$IscsiTargetIqnTextBox = $Window.FindName("IscsiTargetIqnTextBox")
 $IscsiAddMappingButton = $Window.FindName("IscsiAddMappingButton")
 $IscsiRemoveMappingButton = $Window.FindName("IscsiRemoveMappingButton")
 $IscsiBuildPlanButton = $Window.FindName("IscsiBuildPlanButton")
@@ -2777,7 +2774,6 @@ function Refresh-IscsiTargetChoices {
     }
 
     $IscsiTargetComboBox.ItemsSource = $null
-    $IscsiTargetIqnTextBox.Text = ""
 
     $ArrayIdentity = [string]$IscsiArrayComboBox.SelectedValue
 
@@ -2814,26 +2810,11 @@ function Refresh-IscsiTargetChoices {
     }
 }
 
-function Update-IscsiTargetIqnPreview {
-    if (-not $IscsiTargetIqnTextBox) {
-        return
-    }
-
-    if ($IscsiTargetComboBox.SelectedItem) {
-        $IscsiTargetIqnTextBox.Text =
-            [string]$IscsiTargetComboBox.SelectedItem.IQN
-    }
-    else {
-        $IscsiTargetIqnTextBox.Text = ""
-    }
-}
-
 function Refresh-IscsiSmartChoices {
     Refresh-IscsiHostChoices
     Refresh-IscsiArrayChoices
     Refresh-IscsiSourceChoices
     Refresh-IscsiTargetChoices
-    Update-IscsiTargetIqnPreview
 }
 
 function Test-IPv4SameSubnet {
@@ -8214,7 +8195,7 @@ $IscsiAddMappingButton.Add_Click({
         -ArrayName $ArrayName `
         -TargetIP $TargetIP
 
-    $Row.TargetIQN = [string]$IscsiTargetIqnTextBox.Text
+    $Row.TargetIQN = [string]$IscsiTargetComboBox.SelectedItem.IQN
 
     $script:IscsiConnectionResults.Add($Row)
 
@@ -8256,10 +8237,6 @@ $IscsiHostComboBox.Add_SelectionChanged({
 
 $IscsiArrayComboBox.Add_SelectionChanged({
     Refresh-IscsiTargetChoices
-})
-
-$IscsiTargetComboBox.Add_SelectionChanged({
-    Update-IscsiTargetIqnPreview
 })
 
 $IscsiValidateButton.Add_Click({
