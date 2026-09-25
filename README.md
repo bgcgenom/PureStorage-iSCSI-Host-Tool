@@ -2,7 +2,7 @@
 
 PowerShell/WPF utility for validating and configuring Windows Server hosts for Pure Storage iSCSI connectivity, MPIO readiness, host registration, and host-group workflows.
 
-> **Project status:** Current completed release: **v2.5.0**
+> **Project status:** Current completed release: **v2.5.1**
 >
 > This is an independent community project and is not an official Pure Storage product.
 
@@ -226,8 +226,10 @@ Additional documentation is maintained under `Docs/`:
 ```text
 PureStorage-iSCSI-Host-Tool/
 ├── iSCSI-Host-Tool-v2.5.1.ps1
-├── iSCSI-Host-Tool-v2.5.0.ps1
+├── RELEASE-NOTES-v2.5.1.md
 ├── Archive/
+│   ├── iSCSI-Host-Tool-v2.5.0.ps1
+│   ├── RELEASE-NOTES-v2.5.0.md
 │   └── iSCSI-Host-Tool-v2.4.19.ps1
 ├── README.md
 ├── LICENSE
