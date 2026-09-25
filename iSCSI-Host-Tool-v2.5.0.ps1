@@ -4525,14 +4525,14 @@ function Invoke-IscsiHostStorageRefresh {
             Sort-Object -Unique
     )
 
-    foreach ($Host in $Hosts) {
+    foreach ($TargetHost in $Hosts) {
         Write-ToolLog `
-            "STORAGE CACHE REFRESH START host=$Host." `
+            "STORAGE CACHE REFRESH START host=$TargetHost." `
             "INFO"
 
         try {
             Invoke-HostCommand `
-                -ComputerName $Host `
+                -ComputerName $TargetHost `
                 -ScriptBlock {
                     $Command =
                         Get-Command Update-HostStorageCache `
@@ -4555,14 +4555,14 @@ function Invoke-IscsiHostStorageRefresh {
                 } |
                 ForEach-Object {
                     Write-ToolLog `
-                        "STORAGE CACHE REFRESH SUCCESS host=$Host pureDisks=$($_.PureDiskCount)." `
+                        "STORAGE CACHE REFRESH SUCCESS host=$TargetHost pureDisks=$($_.PureDiskCount)." `
                         "INFO"
                 }
         }
         catch {
             # Best-effort rescan: iSCSI writes already completed.
             Write-ToolLog `
-                "STORAGE CACHE REFRESH WARN host=${Host}: $($_.Exception.Message)" `
+                "STORAGE CACHE REFRESH WARN host=${TargetHost}: $($_.Exception.Message)" `
                 "WARN"
         }
     }
