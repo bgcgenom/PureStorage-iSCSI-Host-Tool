@@ -2763,6 +2763,290 @@ function Refresh-IscsiSmartChoices {
     Update-IscsiTargetIqnPreview
 }
 
+function Test-IPv4SameSubnet {
+    param(
+        [string]$SourceIP,
+        [int]$PrefixLength,
+        [string]$TargetIP
+    )
+
+    if ($PrefixLength -lt 0 -or $PrefixLength -gt 32) {
+        return $false
+    }
+
+    try {
+        $Source = [System.Net.IPAddress]::Parse($SourceIP)
+        $Target = [System.Net.IPAddress]::Parse($TargetIP)
+
+        if ($Source.AddressFamily -ne
+            [System.Net.Sockets.AddressFamily]::InterNetwork -or
+            $Target.AddressFamily -ne
+            [System.Net.Sockets.AddressFamily]::InterNetwork) {
+            return $false
+        }
+
+        $SourceBytes = $Source.GetAddressBytes()
+        $TargetBytes = $Target.GetAddressBytes()
+        $BitsRemaining = $PrefixLength
+
+        for ($Index = 0; $Index -lt 4; $Index++) {
+            $Mask =
+                if ($BitsRemaining -ge 8) {
+                    255
+                }
+                elseif ($BitsRemaining -le 0) {
+                    0
+                }
+                else {
+                    256 - [int][math]::Pow(2,(8 - $BitsRemaining))
+                }
+
+            if (($SourceBytes[$Index] -band $Mask) -ne
+                ($TargetBytes[$Index] -band $Mask)) {
+                return $false
+            }
+
+            $BitsRemaining -= 8
+        }
+
+        $true
+    }
+    catch {
+        $false
+    }
+}
+
+function Build-IscsiRecommendedPlan {
+    $CurrentHosts = @(Get-HostList $HostTextBox.Text)
+    $CurrentSignature =
+        (($CurrentHosts |
+            ForEach-Object { $_.ToLowerInvariant() } |
+            Sort-Object) -join "|")
+
+    $AuditCurrent = (
+        $script:WindowsAuditComplete -and
+        -not [string]::IsNullOrWhiteSpace(
+            $script:WindowsAuditHostSignature
+        ) -and
+        $script:WindowsAuditHostSignature -eq $CurrentSignature
+    )
+
+    if (-not $AuditCurrent) {
+        [System.Windows.MessageBox]::Show(
+            "Run a current Windows Host audit before building a recommended iSCSI plan.",
+            "Windows Audit Required",
+            "OK",
+            "Information"
+        ) | Out-Null
+        return
+    }
+
+    $ConnectedArrays = @(
+        Get-IscsiArrayChoices
+    )
+
+    if ($ConnectedArrays.Count -eq 0) {
+        [System.Windows.MessageBox]::Show(
+            "Connect at least one Pure array before building a recommended iSCSI plan.",
+            "Pure Array Required",
+            "OK",
+            "Information"
+        ) | Out-Null
+        return
+    }
+
+    if ($script:IscsiConnectionResults.Count -gt 0) {
+        $Replace = [System.Windows.MessageBox]::Show(
+            "Replace the current iSCSI mapping plan with a newly discovered recommended plan?`n`nThis only changes the in-memory plan. It does not create portals or sessions.",
+            "Rebuild Recommended Plan",
+            "YesNo",
+            "Question"
+        )
+
+        if ($Replace -ne "Yes") {
+            return
+        }
+    }
+
+    Set-BusyState $true
+
+    try {
+        Write-ToolLog `
+            "ISCSI PLANNER START - hosts=$($CurrentHosts.Count) arrays=$($ConnectedArrays.Count)." `
+            "INFO"
+
+        Set-GlobalStatus "Discovering Pure iSCSI target topology..."
+
+        $TargetCatalog = @()
+
+        foreach ($ArrayChoice in $ConnectedArrays) {
+            $ArrayIdentity = [string]$ArrayChoice.Identity
+            $Targets = @(
+                Get-PureIscsiTargetChoices `
+                    -ArrayIdentity $ArrayIdentity
+            )
+
+            foreach ($Target in $Targets) {
+                $TargetCatalog += [pscustomobject]@{
+                    Array      = $ArrayIdentity
+                    TargetIP   = [string]$Target.IPAddress
+                    PortNumber = [int]$Target.PortNumber
+                    PortName   = [string]$Target.PortName
+                    IQN        = [string]$Target.IQN
+                }
+            }
+        }
+
+        if ($TargetCatalog.Count -eq 0) {
+            throw "No Pure iSCSI target ports were discovered on the connected arrays."
+        }
+
+        $ProposedRows = @()
+        $ExcludedSources = New-Object System.Collections.Generic.List[string]
+        $HostPlanCounts = @{}
+
+        foreach ($HostName in $CurrentHosts) {
+            Set-GlobalStatus "Discovering iSCSI topology on $HostName..."
+
+            $Inventory = Get-IscsiHostInventory -HostName $HostName
+
+            foreach ($Source in @($Inventory.SourceAddresses)) {
+                $SourceIP = [string]$Source.IPAddress
+                $PrefixLength = [int]$Source.PrefixLength
+                $MatchingTargets = @(
+                    $TargetCatalog |
+                        Where-Object {
+                            Test-IPv4SameSubnet `
+                                -SourceIP $SourceIP `
+                                -PrefixLength $PrefixLength `
+                                -TargetIP ([string]$_.TargetIP)
+                        }
+                )
+
+                if ($MatchingTargets.Count -eq 0) {
+                    $ExcludedSources.Add(
+                        "$HostName $SourceIP ($([string]$Source.InterfaceAlias))"
+                    )
+                    continue
+                }
+
+                foreach ($Target in $MatchingTargets) {
+                    $Row = New-IscsiMappingRow `
+                        -HostName $HostName `
+                        -SourceIP $SourceIP `
+                        -ArrayName ([string]$Target.Array) `
+                        -TargetIP ([string]$Target.TargetIP)
+
+                    $Row.TargetIQN = [string]$Target.IQN
+                    $Row.Action = "PROPOSED"
+                    $Row.Result =
+                        "RECOMMENDED - same subnet; target $([string]$Target.PortName)"
+
+                    $ProposedRows += $Row
+                }
+            }
+
+            $HostPlanCounts[$HostName] = @(
+                $ProposedRows |
+                    Where-Object {
+                        [string]$_.Host -ieq $HostName
+                    }
+            ).Count
+        }
+
+        $UniqueRows = @(
+            $ProposedRows |
+                Group-Object {
+                    "{0}|{1}|{2}|{3}" -f
+                        ([string]$_.Host).ToLowerInvariant(),
+                        ([string]$_.SourceIP).ToLowerInvariant(),
+                        ([string]$_.Array).ToLowerInvariant(),
+                        ([string]$_.TargetIP).ToLowerInvariant()
+                } |
+                ForEach-Object {
+                    $_.Group | Select-Object -First 1
+                } |
+                Sort-Object Host,SourceIP,Array,TargetIP
+        )
+
+        if ($UniqueRows.Count -eq 0) {
+            throw "No same-subnet host-to-Pure iSCSI mappings were discovered. Use Manual Mapping for routed or non-standard topologies."
+        }
+
+        $script:IscsiConnectionResults.Clear()
+
+        foreach ($Row in $UniqueRows) {
+            $script:IscsiConnectionResults.Add($Row)
+        }
+
+        $OverLimitHosts = @(
+            $CurrentHosts |
+                Where-Object {
+                    [int]$HostPlanCounts[$_] -gt
+                    $script:WindowsMpioMaxPathsPerDevice
+                }
+        )
+
+        foreach ($HostName in $OverLimitHosts) {
+            foreach ($Row in @(
+                $script:IscsiConnectionResults |
+                    Where-Object {
+                        [string]$_.Host -ieq $HostName
+                    }
+            )) {
+                $Row.Result =
+                    "REVIEW - proposed mapping count exceeds Windows 32-path maximum"
+            }
+        }
+
+        Invalidate-IscsiValidationState `
+            -Reason "Recommended plan rebuilt"
+
+        $Summary =
+            "Recommended plan built: $($UniqueRows.Count) mapping(s) across $($CurrentHosts.Count) host(s) and $($ConnectedArrays.Count) connected array(s). Same-subnet Pure targets only; $($ExcludedSources.Count) non-matching host interface(s) excluded."
+
+        if ($OverLimitHosts.Count -gt 0) {
+            $Summary +=
+                " REVIEW REQUIRED: " +
+                ($OverLimitHosts -join ", ") +
+                " exceed the 32-path planning limit."
+        }
+
+        $IscsiSummaryText.Text = $Summary
+        Set-GlobalStatus $Summary
+
+        Write-ToolLog `
+            "ISCSI PLANNER COMPLETE - mappings=$($UniqueRows.Count) excludedSources=$($ExcludedSources.Count) overLimitHosts=$($OverLimitHosts.Count)." `
+            "INFO"
+
+        if ($ExcludedSources.Count -gt 0) {
+            Write-ToolLog `
+                ("ISCSI PLANNER excluded non-matching interfaces: " +
+                 ($ExcludedSources -join "; ")) `
+                "INFO"
+        }
+    }
+    catch {
+        Write-ToolLog `
+            "ISCSI PLANNER FAILED: $($_.Exception.Message)" `
+            "ERROR"
+
+        Set-GlobalStatus "Recommended plan build failed."
+
+        [System.Windows.MessageBox]::Show(
+            "Unable to build the recommended iSCSI plan.`n`n$($_.Exception.Message)",
+            "Recommended Plan",
+            "OK",
+            "Error"
+        ) | Out-Null
+    }
+    finally {
+        Set-BusyState $false
+        Update-IscsiControls
+        Update-SessionStateBanner
+    }
+}
+
 function New-IscsiMappingRow {
     param(
         [string]$HostName = "",
