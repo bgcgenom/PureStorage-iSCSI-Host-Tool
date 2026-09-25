@@ -680,7 +680,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                               CanUserAddRows="False"
                               SelectionMode="Single"
                               FrozenColumnCount="1"
-                              HorizontalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Visible"
                               VerticalScrollBarVisibility="Auto"
                               ScrollViewer.CanContentScroll="True"
                               Margin="0,0,0,8">
