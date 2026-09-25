@@ -3520,8 +3520,18 @@ function Invoke-IscsiConnectionPreflight {
 
     $HostsInScope = @(Get-HostList $HostTextBox.Text)
     $DuplicateKeys = @{}
+    $HostMappingCounts = @{}
 
     foreach ($Map in $Mappings) {
+        $CountHost = ([string]$Map.Host).Trim().ToLowerInvariant()
+
+        if (-not $HostMappingCounts.ContainsKey($CountHost)) {
+            $HostMappingCounts[$CountHost] = 0
+        }
+
+        $HostMappingCounts[$CountHost]++
+
+
         $Key = "{0}|{1}|{2}|{3}" -f
             ([string]$Map.Host).Trim().ToLowerInvariant(),
             ([string]$Map.SourceIP).Trim().ToLowerInvariant(),
@@ -3566,6 +3576,18 @@ function Invoke-IscsiConnectionPreflight {
                 [string]::IsNullOrWhiteSpace($TargetIP)) {
                 $Blocking = $true
                 $Messages.Add("Host, Source IP, Array, and Target IP are required.")
+            }
+
+            $CountKey = $HostName.ToLowerInvariant()
+
+            if ($HostName -and
+                $HostMappingCounts.ContainsKey($CountKey) -and
+                [int]$HostMappingCounts[$CountKey] -gt
+                $script:WindowsMpioMaxPathsPerDevice) {
+                $Blocking = $true
+                $Messages.Add(
+                    "Desired mapping count for this host exceeds the Windows 32-path maximum."
+                )
             }
 
             if ($HostName -and
@@ -8036,6 +8058,10 @@ $IscsiRemoveMappingButton.Add_Click({
         Invalidate-IscsiValidationState `
             -Reason "Mapping removed"
     }
+})
+
+$IscsiBuildPlanButton.Add_Click({
+    Build-IscsiRecommendedPlan
 })
 
 $IscsiRefreshChoicesButton.Add_Click({
