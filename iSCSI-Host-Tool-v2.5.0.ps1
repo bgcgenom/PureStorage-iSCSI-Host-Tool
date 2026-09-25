@@ -259,7 +259,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                              Grid.Row="1"
                              AcceptsReturn="True"
                              VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Visible"
                              FontFamily="Consolas"
                              FontSize="13"/>
 
@@ -741,12 +741,10 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                             <DataGridCheckBoxColumn Header="Use" Binding="{Binding Include}" Width="45" IsReadOnly="False"/>
                             <DataGridTextColumn Header="Source IP" Binding="{Binding SourceIP}" Width="135"/>
                             <DataGridTextColumn Header="Target IP" Binding="{Binding TargetIP}" Width="135"/>
-                            <DataGridTextColumn Header="Target IQN" Binding="{Binding TargetIQN}" Width="285" IsReadOnly="True"/>
                             <DataGridTextColumn Header="TCP/3260" Binding="{Binding TCP3260}" Width="90" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Portal" Binding="{Binding PortalState}" Width="90" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Session" Binding="{Binding SessionState}" Width="90" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="185" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="*" MinWidth="260" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="*" MinWidth="360" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
 
