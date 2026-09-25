@@ -307,30 +307,14 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                         </TextBlock>
                     </Border>
 
-                    <DataGrid x:Name="WindowsResultsGrid"
+                    <TreeView x:Name="WindowsResultsTree"
                               Grid.Row="4"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              SelectionMode="Extended"
-                              SelectionUnit="FullRow"
-                              FrozenColumnCount="1"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto"
-                              Margin="0,0,0,10">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="120"/>
-                            <DataGridTextColumn Header="IQN" Binding="{Binding IQN}" Width="310"/>
-                            <DataGridTextColumn Header="MSiSCSI" Binding="{Binding MSiSCSI}" Width="135"/>
-                            <DataGridTextColumn Header="MPIO" Binding="{Binding MPIO}" Width="105"/>
-                            <DataGridTextColumn Header="PURE DSM" Binding="{Binding PureDSM}" Width="115"/>
-                            <DataGridTextColumn Header="LB Policy" Binding="{Binding LBPolicy}" Width="95"/>
-                            <DataGridTextColumn Header="MPIO Timers" Binding="{Binding MPIOTimers}" Width="135"/>
-                            <DataGridTextColumn Header="Power Plan" Binding="{Binding PowerPlan}" Width="140"/>
-                            <DataGridTextColumn Header="Reboot Required" Binding="{Binding RebootRequired}" Width="125"/>
-                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                              Margin="0,0,0,10"
+                              BorderBrush="Gray"
+                              BorderThickness="1"
+                              HorizontalContentAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"/>
 
                     <StackPanel Grid.Row="5"
                                 Orientation="Horizontal">
@@ -522,25 +506,13 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                                    TextWrapping="Wrap"/>
                     </Border>
 
-                    <DataGrid x:Name="PureResultsGrid"
+                    <TreeView x:Name="PureResultsTree"
                               Grid.Row="4"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              SelectionMode="Single"
-                              FrozenColumnCount="1"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="130"/>
-                            <DataGridTextColumn Header="IQN" Binding="{Binding IQN}" Width="310"/>
-                            <DataGridTextColumn Header="Array" Binding="{Binding FlashArray}" Width="240"/>
-                            <DataGridTextColumn Header="State" Binding="{Binding State}" Width="140"/>
-                            <DataGridTextColumn Header="Host Group" Binding="{Binding HostGroup}" Width="180"/>
-                            <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="190"/>
-                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="*"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                              BorderBrush="Gray"
+                              BorderThickness="1"
+                              HorizontalContentAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"/>
 
                     <TextBlock Grid.Row="5"
                                Text="This tab manages only Pure host objects and optional host-group membership. It does not create or connect volumes."
@@ -839,7 +811,7 @@ $RebootButton = $Window.FindName("RebootButton")
 $WindowsCredentialButton = $Window.FindName("WindowsCredentialButton")
 $WindowsCurrentUserButton = $Window.FindName("WindowsCurrentUserButton")
 $ClearWindowsButton = $Window.FindName("ClearWindowsButton")
-$WindowsResultsGrid = $Window.FindName("WindowsResultsGrid")
+$WindowsResultsTree = $Window.FindName("WindowsResultsTree")
 $CopyIQNButton = $Window.FindName("CopyIQNButton")
 $ExportWindowsButton = $Window.FindName("ExportWindowsButton")
 $WindowsDetailsButton = $Window.FindName("WindowsDetailsButton")
@@ -859,7 +831,7 @@ $ApplyPureButton = $Window.FindName("ApplyPureButton")
 $ExportPureButton = $Window.FindName("ExportPureButton")
 $PureDetailsButton = $Window.FindName("PureDetailsButton")
 $PureSummaryText = $Window.FindName("PureSummaryText")
-$PureResultsGrid = $Window.FindName("PureResultsGrid")
+$PureResultsTree = $Window.FindName("PureResultsTree")
 
 # iSCSI Connections tab
 $IscsiPersistentCheckBox = $Window.FindName("IscsiPersistentCheckBox")
@@ -887,10 +859,8 @@ $PrereqGrid = $Window.FindName("PrereqGrid")
 $PrereqSummaryText = $Window.FindName("PrereqSummaryText")
 
 $script:WindowsResults = New-Object System.Collections.ObjectModel.ObservableCollection[object]
-$WindowsResultsGrid.ItemsSource = $script:WindowsResults
 
 $script:PureResults = New-Object System.Collections.ObjectModel.ObservableCollection[object]
-$PureResultsGrid.ItemsSource = $script:PureResults
 $FlashArrayGrid.ItemsSource = $script:PureArrayEntries
 
 $script:IscsiConnectionResults = New-Object System.Collections.ObjectModel.ObservableCollection[object]
@@ -900,6 +870,247 @@ $PrereqGrid.ItemsSource = $script:PrereqResults
 
 $HostTextBox.Text = @"
 "@.Trim()
+
+
+function Get-SelectedWindowsResult {
+    if (-not $WindowsResultsTree -or -not $WindowsResultsTree.SelectedItem) {
+        return $null
+    }
+
+    $Tag = $WindowsResultsTree.SelectedItem.Tag
+    if ($Tag -and $Tag.PSObject.Properties["Host"] -and
+        $Tag.PSObject.Properties["IQN"]) {
+        return $Tag
+    }
+
+    $null
+}
+
+function Get-SelectedPureResult {
+    if (-not $PureResultsTree -or -not $PureResultsTree.SelectedItem) {
+        return $null
+    }
+
+    $Tag = $PureResultsTree.SelectedItem.Tag
+    if ($Tag -and $Tag.PSObject.Properties["FlashArray"] -and
+        $Tag.PSObject.Properties["State"]) {
+        return $Tag
+    }
+
+    $null
+}
+
+function Refresh-WindowsResultsTree {
+    if (-not $WindowsResultsTree) { return }
+
+    $Expanded = @{}
+    foreach ($Item in @($WindowsResultsTree.Items)) {
+        if ($Item -and $Item.Tag -and $Item.Tag.PSObject.Properties["Host"] -and $Item.IsExpanded) {
+            $Expanded[([string]$Item.Tag.Host).ToLowerInvariant()] = $true
+        }
+    }
+
+    $WindowsResultsTree.Items.Clear()
+
+    foreach ($Row in @($script:WindowsResults | Sort-Object Host)) {
+        $Item = New-Object System.Windows.Controls.TreeViewItem
+        $Item.Tag = $Row
+        $Item.HorizontalContentAlignment = "Stretch"
+        $Key = ([string]$Row.Host).ToLowerInvariant()
+        $Item.IsExpanded = $Expanded.ContainsKey($Key)
+
+        $Header = New-Object System.Windows.Controls.StackPanel
+        $Header.Orientation = "Horizontal"
+
+        $HostText = New-Object System.Windows.Controls.TextBlock
+        $HostText.Text = [string]$Row.Host
+        $HostText.FontWeight = "Bold"
+        $HostText.FontSize = 13
+        $Header.Children.Add($HostText) | Out-Null
+
+        $StatusText = New-Object System.Windows.Controls.TextBlock
+        $StatusText.Margin = "10,0,0,0"
+
+        if ([string]$Row.Status -like "PASS*") {
+            $StatusText.Text = "✓ PASS"
+            $StatusText.Foreground = "DarkGreen"
+            $StatusText.FontWeight = "SemiBold"
+        }
+        else {
+            $StatusText.Text = "⚠ $([string]$Row.Status)"
+            $StatusText.Foreground = "DarkRed"
+            $StatusText.FontWeight = "SemiBold"
+        }
+        $Header.Children.Add($StatusText) | Out-Null
+        $Item.Header = $Header
+
+        $Detail = New-Object System.Windows.Controls.Grid
+        $Detail.Margin = "18,4,0,8"
+        $LabelCol = New-Object System.Windows.Controls.ColumnDefinition
+        $LabelCol.Width = New-Object System.Windows.GridLength(135)
+        $ValueCol = New-Object System.Windows.Controls.ColumnDefinition
+        $ValueCol.Width = New-Object System.Windows.GridLength(1,[System.Windows.GridUnitType]::Star)
+        $Detail.ColumnDefinitions.Add($LabelCol)
+        $Detail.ColumnDefinitions.Add($ValueCol)
+
+        $Pairs = @(
+            @("IQN",[string]$Row.IQN),
+            @("MSiSCSI",[string]$Row.MSiSCSI),
+            @("MPIO",[string]$Row.MPIO),
+            @("PURE DSM",[string]$Row.PureDSM),
+            @("LB Policy",[string]$Row.LBPolicy),
+            @("MPIO Timers",[string]$Row.MPIOTimers),
+            @("Power Plan",[string]$Row.PowerPlan),
+            @("Reboot Required",[string]$Row.RebootRequired)
+        )
+
+        for ($i=0; $i -lt $Pairs.Count; $i++) {
+            $Rd = New-Object System.Windows.Controls.RowDefinition
+            $Rd.Height = [System.Windows.GridLength]::Auto
+            $Detail.RowDefinitions.Add($Rd)
+
+            $L = New-Object System.Windows.Controls.TextBlock
+            $L.Text = "$($Pairs[$i][0]):"
+            $L.FontWeight = "SemiBold"
+            $L.Margin = "0,1,8,1"
+            [System.Windows.Controls.Grid]::SetRow($L,$i)
+            [System.Windows.Controls.Grid]::SetColumn($L,0)
+            $Detail.Children.Add($L) | Out-Null
+
+            $V = New-Object System.Windows.Controls.TextBlock
+            $V.Text = [string]$Pairs[$i][1]
+            $V.Margin = "0,1,0,1"
+            $V.TextWrapping = "Wrap"
+            [System.Windows.Controls.Grid]::SetRow($V,$i)
+            [System.Windows.Controls.Grid]::SetColumn($V,1)
+            $Detail.Children.Add($V) | Out-Null
+        }
+
+        $DetailItem = New-Object System.Windows.Controls.TreeViewItem
+        $DetailItem.IsEnabled = $false
+        $DetailItem.Header = $Detail
+        $Item.Items.Add($DetailItem) | Out-Null
+        $WindowsResultsTree.Items.Add($Item) | Out-Null
+    }
+}
+
+function Refresh-PureResultsTree {
+    if (-not $PureResultsTree) { return }
+
+    $ExpandedHosts = @{}
+    $ExpandedArrays = @{}
+
+    foreach ($HostItem in @($PureResultsTree.Items)) {
+        if (-not $HostItem -or -not $HostItem.Tag) { continue }
+        if ($HostItem.Tag.PSObject.Properties["NodeType"] -and
+            [string]$HostItem.Tag.NodeType -eq "Host") {
+            $HostKey = ([string]$HostItem.Tag.Host).ToLowerInvariant()
+            if ($HostItem.IsExpanded) { $ExpandedHosts[$HostKey] = $true }
+
+            foreach ($ArrayItem in @($HostItem.Items)) {
+                if ($ArrayItem -and $ArrayItem.Tag -and
+                    $ArrayItem.Tag.PSObject.Properties["FlashArray"]) {
+                    $Key = "{0}|{1}" -f $HostKey,([string]$ArrayItem.Tag.FlashArray).ToLowerInvariant()
+                    if ($ArrayItem.IsExpanded) { $ExpandedArrays[$Key] = $true }
+                }
+            }
+        }
+    }
+
+    $PureResultsTree.Items.Clear()
+
+    foreach ($HostGroup in @($script:PureResults | Group-Object Host | Sort-Object Name)) {
+        $HostItem = New-Object System.Windows.Controls.TreeViewItem
+        $HostItem.HorizontalContentAlignment = "Stretch"
+        $HostKey = ([string]$HostGroup.Name).ToLowerInvariant()
+        $HostItem.IsExpanded = $ExpandedHosts.ContainsKey($HostKey)
+        $HostItem.Tag = [pscustomobject]@{ NodeType="Host"; Host=[string]$HostGroup.Name }
+
+        $Header = New-Object System.Windows.Controls.StackPanel
+        $Header.Orientation = "Horizontal"
+
+        $Name = New-Object System.Windows.Controls.TextBlock
+        $Name.Text = [string]$HostGroup.Name
+        $Name.FontWeight = "Bold"
+        $Name.FontSize = 13
+        $Header.Children.Add($Name) | Out-Null
+
+        $Blocked = @($HostGroup.Group | Where-Object { [string]$_.Result -like "BLOCKED*" }).Count
+        $HostStatus = New-Object System.Windows.Controls.TextBlock
+        $HostStatus.Margin = "10,0,0,0"
+        if ($Blocked -gt 0) {
+            $HostStatus.Text = "⚠ BLOCKED"
+            $HostStatus.Foreground = "DarkRed"
+            $HostStatus.FontWeight = "SemiBold"
+        }
+        elseif ($script:PureValidationReady) {
+            $HostStatus.Text = "✓ Validated"
+            $HostStatus.Foreground = "DarkGreen"
+            $HostStatus.FontWeight = "SemiBold"
+        }
+        else {
+            $HostStatus.Text = "• Not validated"
+            $HostStatus.Foreground = "Gray"
+        }
+        $Header.Children.Add($HostStatus) | Out-Null
+        $HostItem.Header = $Header
+
+        foreach ($Row in @($HostGroup.Group | Sort-Object FlashArray)) {
+            $ArrayItem = New-Object System.Windows.Controls.TreeViewItem
+            $ArrayItem.Tag = $Row
+            $ArrayItem.HorizontalContentAlignment = "Stretch"
+            $ArrayKey = "{0}|{1}" -f $HostKey,([string]$Row.FlashArray).ToLowerInvariant()
+            $ArrayItem.IsExpanded = $ExpandedArrays.ContainsKey($ArrayKey)
+
+            $ArrayHeader = New-Object System.Windows.Controls.StackPanel
+            $ArrayHeader.Orientation = "Horizontal"
+
+            $ArrayName = New-Object System.Windows.Controls.TextBlock
+            $ArrayName.Text = [string]$Row.FlashArray
+            $ArrayName.FontWeight = "SemiBold"
+            $ArrayHeader.Children.Add($ArrayName) | Out-Null
+
+            $State = New-Object System.Windows.Controls.TextBlock
+            $State.Text = "  $([string]$Row.State)"
+            $State.Margin = "8,0,0,0"
+            if ([string]$Row.Result -like "BLOCKED*") {
+                $State.Foreground = "DarkRed"
+                $State.FontWeight = "SemiBold"
+            }
+            elseif ([string]$Row.State -eq "MATCH") {
+                $State.Foreground = "DarkGreen"
+            }
+            else {
+                $State.Foreground = "DarkGoldenrod"
+            }
+            $ArrayHeader.Children.Add($State) | Out-Null
+            $ArrayItem.Header = $ArrayHeader
+
+            $Detail = New-Object System.Windows.Controls.StackPanel
+            $Detail.Margin = "18,3,0,6"
+            foreach ($Line in @(
+                "IQN: $($Row.IQN)",
+                "Host Group: $($Row.HostGroup)",
+                "Action: $($Row.Action)",
+                "Result: $($Row.Result)"
+            )) {
+                $T = New-Object System.Windows.Controls.TextBlock
+                $T.Text = $Line
+                $T.TextWrapping = "Wrap"
+                $T.Margin = "0,1,0,1"
+                $Detail.Children.Add($T) | Out-Null
+            }
+
+            $DetailItem = New-Object System.Windows.Controls.TreeViewItem
+            $DetailItem.IsEnabled = $false
+            $DetailItem.Header = $Detail
+            $ArrayItem.Items.Add($DetailItem) | Out-Null
+            $HostItem.Items.Add($ArrayItem) | Out-Null
+        }
+
+        $PureResultsTree.Items.Add($HostItem) | Out-Null
+    }
+}
 
 function Update-SessionStateBanner {
     if (-not $SessionStateText) {
@@ -969,6 +1180,8 @@ function Update-SessionStateBanner {
     $SessionStateText.Text =
         "Audit: $AuditText | Arrays: $ConnectedArrays/$TotalArrays Connected | Validation: $ValidationText$VerifyText | iSCSI: $IscsiText"
 
+    Refresh-WindowsResultsTree
+    Refresh-PureResultsTree
     Update-ValidationControls
     Update-IscsiControls
 }
@@ -1739,25 +1952,9 @@ function Show-PureRegistrationConfirmation {
         return $false
     }
 
-    # Use the visible validation grid as the operator-facing display source.
-    # The underlying Apply operation still uses $script:PurePlan.
-    $GridRows = @()
-
-    if ($PureResultsGrid) {
-        foreach ($Item in @($PureResultsGrid.Items)) {
-            if (
-                $null -ne $Item -and
-                $Item -ne [System.Windows.Data.CollectionView]::NewItemPlaceholder
-            ) {
-                $GridRows += $Item
-            }
-        }
-    }
-
-    if ($GridRows.Count -eq 0) {
-        $GridRows =
-            @($script:PureResults)
-    }
+    # Use the validated Pure result objects as the operator-facing display source.
+    # The TreeView is presentation-only; Apply still uses $script:PurePlan.
+    $GridRows = @($script:PureResults)
 
     $Rows =
         @(
@@ -4928,11 +5125,11 @@ function Update-ConflictReviewControls {
     try {
         $ReviewConflictButton.IsEnabled = $false
 
-        if (-not $PureResultsGrid) {
+        if (-not $PureResultsTree) {
             return
         }
 
-        $Selected = $PureResultsGrid.SelectedItem
+        $Selected = Get-SelectedPureResult
 
         if (-not $Selected) {
             $ReviewConflictButton.ToolTip =
@@ -7585,7 +7782,7 @@ function Validate-PureRegistrationCore {
             Write-ToolLog "Pure registration validation passed."
         }
 
-        $PureResultsGrid.Items.Refresh()
+        Refresh-PureResultsTree
     }
     catch {
         $script:PureValidationReady = $false
@@ -9369,7 +9566,7 @@ $ExportWindowsButton.Add_Click({
 })
 
 $WindowsDetailsButton.Add_Click({
-    $Selected = $WindowsResultsGrid.SelectedItem
+    $Selected = Get-SelectedWindowsResult
 
     if (-not $Selected) {
         [System.Windows.MessageBox]::Show(
@@ -9470,8 +9667,9 @@ $ValidatePureButton.Add_Click({
     Update-ConflictReviewButtonState
 })
 
-$PureResultsGrid.Add_SelectionChanged({
+$PureResultsTree.Add_SelectedItemChanged({
     Update-ConflictReviewButtonState
+    Update-ConflictReviewControls
 })
 
 $ReviewConflictButton.Add_Click({
@@ -9586,12 +9784,6 @@ if ($HostGroupNameTextBox) {
 
 Update-ValidationControls
 # v2.4.7 conflict-review selection refresh
-if ($PureResultsGrid) {
-    $PureResultsGrid.Add_SelectionChanged({
-        Update-ConflictReviewControls
-    })
-}
-
 Update-ConflictReviewControls
 if ($PureDetailsButton) {
     $PureDetailsButton.Add_Click({
@@ -9658,6 +9850,8 @@ if ($HelpButton) {
     })
 }
 
+Refresh-WindowsResultsTree
+Refresh-PureResultsTree
 Refresh-IscsiSmartChoices
 Refresh-IscsiPlanTree
 Update-IscsiRemoveButtonLabel
