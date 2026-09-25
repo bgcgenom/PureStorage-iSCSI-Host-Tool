@@ -4512,6 +4512,61 @@ function Show-IscsiChangePreview {
         -Text (Get-IscsiChangePreview)
 }
 
+function Invoke-IscsiHostStorageRefresh {
+    param(
+        [string[]]$HostName
+    )
+
+    $Hosts = @(
+        $HostName |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace([string]$_)
+            } |
+            Sort-Object -Unique
+    )
+
+    foreach ($Host in $Hosts) {
+        Write-ToolLog `
+            "STORAGE CACHE REFRESH START host=$Host." `
+            "INFO"
+
+        try {
+            Invoke-HostCommand `
+                -ComputerName $Host `
+                -ScriptBlock {
+                    $Command =
+                        Get-Command Update-HostStorageCache `
+                            -ErrorAction SilentlyContinue
+
+                    if (-not $Command) {
+                        throw "Update-HostStorageCache is not available on this host."
+                    }
+
+                    Update-HostStorageCache -ErrorAction Stop
+
+                    [pscustomobject]@{
+                        PureDiskCount = @(
+                            Get-Disk -ErrorAction SilentlyContinue |
+                                Where-Object {
+                                    $_.FriendlyName -match "PURE|FlashArray"
+                                }
+                        ).Count
+                    }
+                } |
+                ForEach-Object {
+                    Write-ToolLog `
+                        "STORAGE CACHE REFRESH SUCCESS host=$Host pureDisks=$($_.PureDiskCount)." `
+                        "INFO"
+                }
+        }
+        catch {
+            # Best-effort rescan: iSCSI writes already completed.
+            Write-ToolLog `
+                "STORAGE CACHE REFRESH WARN host=${Host}: $($_.Exception.Message)" `
+                "WARN"
+        }
+    }
+}
 function Get-IscsiPostVerifyInventory {
     param([string]$HostName)
 
@@ -4920,7 +4975,7 @@ function Apply-IscsiConnections {
         "Apply this iSCSI connection plan?" +
         [Environment]::NewLine +
         [Environment]::NewLine +
-        "This may create Windows iSCSI target portals and persistent/multipath sessions." +
+        "This may create Windows iSCSI target portals and persistent/multipath sessions. After successful connection writes, the tool will run Update-HostStorageCache on affected hosts before post-verification." +
         [Environment]::NewLine +
         "It will NOT create or map Pure volumes, initialize or format disks, change MPIO policy, modify preferred-array settings, create CSVs, or modify Failover Cluster configuration."
     )
@@ -5079,8 +5134,20 @@ function Apply-IscsiConnections {
         return
     }
 
+    $AppliedHosts = @(
+        $script:IscsiConnectionPlan |
+            Where-Object { -not $_.Blocking } |
+            Select-Object -ExpandProperty Host -Unique
+    )
+
     Write-ToolLog `
-        "ISCSI APPLY COMPLETE planned=$(@($script:IscsiConnectionPlan).Count). Starting post-verification." `
+        "ISCSI APPLY COMPLETE planned=$(@($script:IscsiConnectionPlan).Count). Refreshing Windows storage cache on $($AppliedHosts.Count) host(s)." `
+        "INFO"
+
+    Invoke-IscsiHostStorageRefresh -HostName $AppliedHosts
+
+    Write-ToolLog `
+        "ISCSI STORAGE CACHE REFRESH COMPLETE. Starting post-verification." `
         "INFO"
 
     Test-IscsiConnectionPostVerification | Out-Null
