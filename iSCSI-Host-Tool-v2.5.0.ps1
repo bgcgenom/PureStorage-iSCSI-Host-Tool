@@ -666,85 +666,14 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                         </Grid>
                     </GroupBox>
 
-                    <DataGrid x:Name="IscsiMappingGrid"
+                    <TreeView x:Name="IscsiPlanTree"
                               Grid.Row="2"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              SelectionMode="Single"
-                              FrozenColumnCount="1"
-                              HorizontalScrollBarVisibility="Visible"
-                              VerticalScrollBarVisibility="Auto"
-                              ScrollViewer.CanContentScroll="True"
-                              Margin="0,0,0,8">
-                        <DataGrid.GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.ContainerStyle>
-                                    <Style TargetType="{x:Type GroupItem}">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                    <Expander IsExpanded="False"
-                                                              Margin="0,2,0,2">
-                                                        <Expander.Header>
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <TextBlock Text="{Binding Name}"
-                                                                           FontWeight="Bold"
-                                                                           FontSize="13"/>
-                                                                <TextBlock Text="{Binding ItemCount, StringFormat=  ({0} connections)}"
-                                                                           Margin="6,0,0,0"
-                                                                           Foreground="Gray"/>
-                                                            </StackPanel>
-                                                        </Expander.Header>
-                                                        <ItemsPresenter Margin="16,2,0,4"/>
-                                                    </Expander>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </GroupStyle.ContainerStyle>
-                            </GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.ContainerStyle>
-                                    <Style TargetType="{x:Type GroupItem}">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                    <Expander IsExpanded="False"
-                                                              Margin="0,1,0,1">
-                                                        <Expander.Header>
-                                                            <StackPanel>
-                                                                <StackPanel Orientation="Horizontal">
-                                                                    <TextBlock Text="{Binding Name}"
-                                                                               FontWeight="SemiBold"/>
-                                                                    <TextBlock Text="{Binding ItemCount, StringFormat=  ({0} paths)}"
-                                                                               Margin="6,0,0,0"
-                                                                               Foreground="Gray"/>
-                                                                </StackPanel>
-                                                                <TextBlock Text="{Binding Items[0].TargetIQN, StringFormat=IQN: {0}}"
-                                                                           Margin="16,1,0,0"
-                                                                           Foreground="Gray"
-                                                                           FontSize="11"/>
-                                                            </StackPanel>
-                                                        </Expander.Header>
-                                                        <ItemsPresenter Margin="16,2,0,4"/>
-                                                    </Expander>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </GroupStyle.ContainerStyle>
-                            </GroupStyle>
-                        </DataGrid.GroupStyle>
-                        <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="Use" Binding="{Binding Include}" Width="45" IsReadOnly="False"/>
-                            <DataGridTextColumn Header="Source IP" Binding="{Binding SourceIP}" Width="135"/>
-                            <DataGridTextColumn Header="Target IP" Binding="{Binding TargetIP}" Width="135"/>
-                            <DataGridTextColumn Header="TCP/3260" Binding="{Binding TCP3260}" Width="90" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Portal" Binding="{Binding PortalState}" Width="90" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Session" Binding="{Binding SessionState}" Width="90" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="*" MinWidth="360" IsReadOnly="True"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                              Margin="0,0,0,8"
+                              BorderBrush="Gray"
+                              BorderThickness="1"
+                              HorizontalContentAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"/>
 
                     <StackPanel Grid.Row="3"
                                 Orientation="Horizontal"
@@ -944,7 +873,7 @@ $IscsiAddMappingButton = $Window.FindName("IscsiAddMappingButton")
 $IscsiRemoveMappingButton = $Window.FindName("IscsiRemoveMappingButton")
 $IscsiBuildPlanButton = $Window.FindName("IscsiBuildPlanButton")
 $IscsiRefreshChoicesButton = $Window.FindName("IscsiRefreshChoicesButton")
-$IscsiMappingGrid = $Window.FindName("IscsiMappingGrid")
+$IscsiPlanTree = $Window.FindName("IscsiPlanTree")
 $IscsiValidateButton = $Window.FindName("IscsiValidateButton")
 $IscsiPreviewButton = $Window.FindName("IscsiPreviewButton")
 $IscsiApplyButton = $Window.FindName("IscsiApplyButton")
@@ -965,30 +894,6 @@ $PureResultsGrid.ItemsSource = $script:PureResults
 $FlashArrayGrid.ItemsSource = $script:PureArrayEntries
 
 $script:IscsiConnectionResults = New-Object System.Collections.ObjectModel.ObservableCollection[object]
-$script:IscsiConnectionView = [System.Windows.Data.CollectionViewSource]::GetDefaultView(
-    $script:IscsiConnectionResults
-)
-$script:IscsiConnectionView.GroupDescriptions.Clear()
-$script:IscsiConnectionView.GroupDescriptions.Add(
-    (New-Object System.Windows.Data.PropertyGroupDescription("Host"))
-)
-$script:IscsiConnectionView.GroupDescriptions.Add(
-    (New-Object System.Windows.Data.PropertyGroupDescription("Array"))
-)
-$script:IscsiConnectionView.SortDescriptions.Clear()
-$script:IscsiConnectionView.SortDescriptions.Add(
-    (New-Object System.ComponentModel.SortDescription("Host","Ascending"))
-)
-$script:IscsiConnectionView.SortDescriptions.Add(
-    (New-Object System.ComponentModel.SortDescription("Array","Ascending"))
-)
-$script:IscsiConnectionView.SortDescriptions.Add(
-    (New-Object System.ComponentModel.SortDescription("SourceIP","Ascending"))
-)
-$script:IscsiConnectionView.SortDescriptions.Add(
-    (New-Object System.ComponentModel.SortDescription("TargetIP","Ascending"))
-)
-$IscsiMappingGrid.ItemsSource = $script:IscsiConnectionView
 
 $script:PrereqResults = New-Object System.Collections.ObjectModel.ObservableCollection[object]
 $PrereqGrid.ItemsSource = $script:PrereqResults
@@ -2529,6 +2434,7 @@ function Reset-ToolSession {
     if ($script:IscsiConnectionResults) {
         $script:IscsiConnectionResults.Clear()
     }
+    Refresh-IscsiPlanTree
 
     if ($IscsiSummaryText) {
         $IscsiSummaryText.Text =
@@ -3033,6 +2939,8 @@ function Build-IscsiRecommendedPlan {
             $script:IscsiConnectionResults.Add($Row)
         }
 
+        Refresh-IscsiPlanTree
+
         $OverLimitHosts = @(
             $CurrentHosts |
                 Where-Object {
@@ -3121,6 +3029,165 @@ function New-IscsiMappingRow {
         SessionState = ""
         Action       = ""
         Result       = ""
+    }
+}
+
+
+function Refresh-IscsiPlanTree {
+    if (-not $IscsiPlanTree) {
+        return
+    }
+
+    $IscsiPlanTree.Items.Clear()
+
+    $HostGroups = @(
+        $script:IscsiConnectionResults |
+            Group-Object Host |
+            Sort-Object Name
+    )
+
+    foreach ($HostGroup in $HostGroups) {
+        $HostItem = New-Object System.Windows.Controls.TreeViewItem
+        $HostItem.IsExpanded = $false
+        $HostItem.HorizontalContentAlignment = "Stretch"
+
+        $HostHeader = New-Object System.Windows.Controls.StackPanel
+        $HostHeader.Orientation = "Horizontal"
+
+        $HostNameText = New-Object System.Windows.Controls.TextBlock
+        $HostNameText.Text = [string]$HostGroup.Name
+        $HostNameText.FontWeight = "Bold"
+        $HostNameText.FontSize = 13
+        $HostHeader.Children.Add($HostNameText) | Out-Null
+
+        $HostCountText = New-Object System.Windows.Controls.TextBlock
+        $HostCountText.Text = " ($($HostGroup.Count) connections)"
+        $HostCountText.Foreground = "Gray"
+        $HostCountText.Margin = "6,0,0,0"
+        $HostHeader.Children.Add($HostCountText) | Out-Null
+
+        $HostItem.Header = $HostHeader
+
+        foreach ($ArrayGroup in @(
+            $HostGroup.Group |
+                Group-Object Array |
+                Sort-Object Name
+        )) {
+            $ArrayItem = New-Object System.Windows.Controls.TreeViewItem
+            $ArrayItem.IsExpanded = $false
+            $ArrayItem.HorizontalContentAlignment = "Stretch"
+
+            $ArrayHeader = New-Object System.Windows.Controls.StackPanel
+
+            $ArrayTitleLine = New-Object System.Windows.Controls.StackPanel
+            $ArrayTitleLine.Orientation = "Horizontal"
+
+            $ArrayNameText = New-Object System.Windows.Controls.TextBlock
+            $ArrayNameText.Text = [string]$ArrayGroup.Name
+            $ArrayNameText.FontWeight = "SemiBold"
+            $ArrayTitleLine.Children.Add($ArrayNameText) | Out-Null
+
+            $ArrayCountText = New-Object System.Windows.Controls.TextBlock
+            $ArrayCountText.Text = " ($($ArrayGroup.Count) paths)"
+            $ArrayCountText.Foreground = "Gray"
+            $ArrayCountText.Margin = "6,0,0,0"
+            $ArrayTitleLine.Children.Add($ArrayCountText) | Out-Null
+
+            $ArrayHeader.Children.Add($ArrayTitleLine) | Out-Null
+
+            $FirstRow = @($ArrayGroup.Group)[0]
+            if ($FirstRow -and
+                -not [string]::IsNullOrWhiteSpace([string]$FirstRow.TargetIQN)) {
+                $IqnText = New-Object System.Windows.Controls.TextBlock
+                $IqnText.Text = "IQN: $([string]$FirstRow.TargetIQN)"
+                $IqnText.Foreground = "Gray"
+                $IqnText.FontSize = 11
+                $IqnText.Margin = "16,1,0,0"
+                $ArrayHeader.Children.Add($IqnText) | Out-Null
+            }
+
+            $ArrayItem.Header = $ArrayHeader
+
+            $HeaderItem = New-Object System.Windows.Controls.TreeViewItem
+            $HeaderItem.IsEnabled = $false
+            $HeaderGrid = New-Object System.Windows.Controls.Grid
+
+            foreach ($Width in @(45,140,140,85,85,85,420)) {
+                $Col = New-Object System.Windows.Controls.ColumnDefinition
+                $Col.Width = New-Object System.Windows.GridLength($Width)
+                $HeaderGrid.ColumnDefinitions.Add($Col)
+            }
+
+            $Labels = @("Use","Source IP","Target IP","TCP/3260","Portal","Session","Result")
+            for ($i = 0; $i -lt $Labels.Count; $i++) {
+                $Tb = New-Object System.Windows.Controls.TextBlock
+                $Tb.Text = $Labels[$i]
+                $Tb.FontWeight = "SemiBold"
+                $Tb.Margin = "2,0,8,2"
+                [System.Windows.Controls.Grid]::SetColumn($Tb,$i)
+                $HeaderGrid.Children.Add($Tb) | Out-Null
+            }
+            $HeaderItem.Header = $HeaderGrid
+            $ArrayItem.Items.Add($HeaderItem) | Out-Null
+
+            foreach ($Row in @(
+                $ArrayGroup.Group |
+                    Sort-Object SourceIP,TargetIP
+            )) {
+                $PathItem = New-Object System.Windows.Controls.TreeViewItem
+                $PathItem.Tag = $Row
+                $PathItem.HorizontalContentAlignment = "Stretch"
+
+                $PathGrid = New-Object System.Windows.Controls.Grid
+                foreach ($Width in @(45,140,140,85,85,85,420)) {
+                    $Col = New-Object System.Windows.Controls.ColumnDefinition
+                    $Col.Width = New-Object System.Windows.GridLength($Width)
+                    $PathGrid.ColumnDefinitions.Add($Col)
+                }
+
+                $Use = New-Object System.Windows.Controls.CheckBox
+                $Use.IsChecked = [bool]$Row.Include
+                $Use.VerticalAlignment = "Center"
+                $Use.Tag = $Row
+                $Use.Add_Click({
+                    param($Sender,$EventArgs)
+                    if ($Sender.Tag) {
+                        $Sender.Tag.Include = [bool]$Sender.IsChecked
+                        Invalidate-IscsiValidationState -Reason "Mapping plan edited"
+                    }
+                })
+                [System.Windows.Controls.Grid]::SetColumn($Use,0)
+                $PathGrid.Children.Add($Use) | Out-Null
+
+                $Values = @(
+                    [string]$Row.SourceIP,
+                    [string]$Row.TargetIP,
+                    [string]$Row.TCP3260,
+                    [string]$Row.PortalState,
+                    [string]$Row.SessionState,
+                    [string]$Row.Result
+                )
+
+                for ($i = 0; $i -lt $Values.Count; $i++) {
+                    $Tb = New-Object System.Windows.Controls.TextBlock
+                    $Tb.Text = $Values[$i]
+                    $Tb.Margin = "2,0,8,0"
+                    $Tb.VerticalAlignment = "Center"
+                    if ($i -eq 5) {
+                        $Tb.TextWrapping = "NoWrap"
+                    }
+                    [System.Windows.Controls.Grid]::SetColumn($Tb,$i + 1)
+                    $PathGrid.Children.Add($Tb) | Out-Null
+                }
+
+                $PathItem.Header = $PathGrid
+                $ArrayItem.Items.Add($PathItem) | Out-Null
+            }
+
+            $HostItem.Items.Add($ArrayItem) | Out-Null
+        }
+
+        $IscsiPlanTree.Items.Add($HostItem) | Out-Null
     }
 }
 
@@ -3528,17 +3595,6 @@ function Get-PureRecommendedMpioExpectation {
 }
 
 function Invoke-IscsiConnectionPreflight {
-    if ($IscsiMappingGrid) {
-        $null = $IscsiMappingGrid.CommitEdit(
-            [System.Windows.Controls.DataGridEditingUnit]::Cell,
-            $true
-        )
-        $null = $IscsiMappingGrid.CommitEdit(
-            [System.Windows.Controls.DataGridEditingUnit]::Row,
-            $true
-        )
-    }
-
     $Mappings = @(Get-IscsiSelectedMappings)
 
     if ($Mappings.Count -eq 0) {
@@ -3885,8 +3941,9 @@ function Invoke-IscsiConnectionPreflight {
                 "ISCSI PLAN host=$HostName source=$SourceIP array=$ArrayIdentity target=$TargetIP portal=$PortalState session=$SessionState action=$Action blocking=$Blocking." `
                 "INFO"
 
-            $IscsiMappingGrid.Items.Refresh()
         }
+
+        Refresh-IscsiPlanTree
 
         $script:IscsiConnectionPlan = @($Plan)
         $script:LastIscsiPreflightTime = Get-Date
@@ -4446,6 +4503,7 @@ function Test-IscsiConnectionPostVerification {
         "ISCSI POST-VERIFY COMPLETE result=FAILED issues=$($Failures -join '; ')." `
         "WARN"
 
+    Refresh-IscsiPlanTree
     Update-SessionStateBanner
     $false
 }
@@ -8201,25 +8259,28 @@ $IscsiAddMappingButton.Add_Click({
 
     Invalidate-IscsiValidationState -Reason "Mapping added"
 
-    $IscsiMappingGrid.SelectedIndex =
-        $script:IscsiConnectionResults.Count - 1
-
-    if ($IscsiMappingGrid.SelectedItem) {
-        $IscsiMappingGrid.ScrollIntoView(
-            $IscsiMappingGrid.SelectedItem
-        )
-    }
+    Refresh-IscsiPlanTree
 })
 
 $IscsiRemoveMappingButton.Add_Click({
-    if ($IscsiMappingGrid.SelectedItem) {
-        $null =
-            $script:IscsiConnectionResults.Remove(
-                $IscsiMappingGrid.SelectedItem
-            )
+    $Selected = $IscsiPlanTree.SelectedItem
+
+    if ($Selected -and
+        $Selected.Tag -and
+        $Selected.Tag.PSObject.Properties["Host"]) {
+        $null = $script:IscsiConnectionResults.Remove($Selected.Tag)
+        Refresh-IscsiPlanTree
 
         Invalidate-IscsiValidationState `
             -Reason "Mapping removed"
+    }
+    else {
+        [System.Windows.MessageBox]::Show(
+            "Select an individual path row to remove.",
+            "Remove Mapping",
+            "OK",
+            "Information"
+        ) | Out-Null
     }
 })
 
@@ -8254,13 +8315,6 @@ $IscsiApplyButton.Add_Click({
 $IscsiExportButton.Add_Click({
     Export-IscsiConnectionResults
 })
-
-if ($IscsiMappingGrid) {
-    $IscsiMappingGrid.Add_CellEditEnding({
-        Invalidate-IscsiValidationState `
-            -Reason "Mapping plan edited"
-    })
-}
 
 if ($IscsiPersistentCheckBox) {
     $IscsiPersistentCheckBox.Add_Click({
@@ -9436,5 +9490,6 @@ if ($HelpButton) {
 }
 
 Refresh-IscsiSmartChoices
+Refresh-IscsiPlanTree
 Update-IscsiControls
 $null = $Window.ShowDialog()
