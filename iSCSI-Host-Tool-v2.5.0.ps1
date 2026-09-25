@@ -3105,12 +3105,52 @@ function Refresh-IscsiPlanTree {
         $HostNameText.FontSize = 13
         $HostHeader.Children.Add($HostNameText) | Out-Null
 
+        $HostEnabledRows = @(
+            $HostGroup.Group |
+                Where-Object { $_.Include -eq $true }
+        )
+
         $HostCountText = New-Object System.Windows.Controls.TextBlock
-        $HostCountText.Text = " ($($HostGroup.Count) connections)"
+        $HostCountText.Text =
+            if ($HostEnabledRows.Count -eq $HostGroup.Count) {
+                " ($($HostGroup.Count) connections)"
+            }
+            else {
+                " ($($HostGroup.Count) connections; $($HostEnabledRows.Count) enabled)"
+            }
         $HostCountText.Foreground = "Gray"
         $HostCountText.Margin = "6,0,0,0"
         $HostHeader.Children.Add($HostCountText) | Out-Null
 
+        $HostStatusText = New-Object System.Windows.Controls.TextBlock
+        $HostStatusText.Margin = "10,0,0,0"
+
+        if ($script:LastIscsiApplyVerificationTime) {
+            $HostStatusText.Text = "✓ Verified"
+            $HostStatusText.Foreground = "DarkGreen"
+            $HostStatusText.FontWeight = "SemiBold"
+        }
+        elseif ($script:IscsiValidationReady -and
+                $HostEnabledRows.Count -gt 0) {
+            $HostStatusText.Text = "✓ Validated"
+            $HostStatusText.Foreground = "DarkGreen"
+            $HostStatusText.FontWeight = "SemiBold"
+        }
+        elseif ([string]$script:IscsiValidationReason -eq "BLOCKED") {
+            $HostStatusText.Text = "⚠ Blocked"
+            $HostStatusText.Foreground = "DarkRed"
+            $HostStatusText.FontWeight = "SemiBold"
+        }
+        elseif ([string]$script:IscsiValidationReason -eq "STALE") {
+            $HostStatusText.Text = "• Stale"
+            $HostStatusText.Foreground = "DarkGoldenrod"
+        }
+        else {
+            $HostStatusText.Text = "• Not validated"
+            $HostStatusText.Foreground = "Gray"
+        }
+
+        $HostHeader.Children.Add($HostStatusText) | Out-Null
         $HostItem.Header = $HostHeader
 
         foreach ($ArrayGroup in @(
@@ -3140,12 +3180,52 @@ function Refresh-IscsiPlanTree {
             $ArrayNameText.FontWeight = "SemiBold"
             $ArrayTitleLine.Children.Add($ArrayNameText) | Out-Null
 
+            $ArrayEnabledRows = @(
+                $ArrayGroup.Group |
+                    Where-Object { $_.Include -eq $true }
+            )
+
             $ArrayCountText = New-Object System.Windows.Controls.TextBlock
-            $ArrayCountText.Text = " ($($ArrayGroup.Count) paths)"
+            $ArrayCountText.Text =
+                if ($ArrayEnabledRows.Count -eq $ArrayGroup.Count) {
+                    " ($($ArrayGroup.Count) paths)"
+                }
+                else {
+                    " ($($ArrayGroup.Count) paths; $($ArrayEnabledRows.Count) enabled)"
+                }
             $ArrayCountText.Foreground = "Gray"
             $ArrayCountText.Margin = "6,0,0,0"
             $ArrayTitleLine.Children.Add($ArrayCountText) | Out-Null
 
+            $ArrayStatusText = New-Object System.Windows.Controls.TextBlock
+            $ArrayStatusText.Margin = "10,0,0,0"
+
+            if ($script:LastIscsiApplyVerificationTime) {
+                $ArrayStatusText.Text = "✓ Verified"
+                $ArrayStatusText.Foreground = "DarkGreen"
+                $ArrayStatusText.FontWeight = "SemiBold"
+            }
+            elseif ($script:IscsiValidationReady -and
+                    $ArrayEnabledRows.Count -gt 0) {
+                $ArrayStatusText.Text = "✓ Validated"
+                $ArrayStatusText.Foreground = "DarkGreen"
+                $ArrayStatusText.FontWeight = "SemiBold"
+            }
+            elseif ([string]$script:IscsiValidationReason -eq "BLOCKED") {
+                $ArrayStatusText.Text = "⚠ Blocked"
+                $ArrayStatusText.Foreground = "DarkRed"
+                $ArrayStatusText.FontWeight = "SemiBold"
+            }
+            elseif ([string]$script:IscsiValidationReason -eq "STALE") {
+                $ArrayStatusText.Text = "• Stale"
+                $ArrayStatusText.Foreground = "DarkGoldenrod"
+            }
+            else {
+                $ArrayStatusText.Text = "• Not validated"
+                $ArrayStatusText.Foreground = "Gray"
+            }
+
+            $ArrayTitleLine.Children.Add($ArrayStatusText) | Out-Null
             $ArrayHeader.Children.Add($ArrayTitleLine) | Out-Null
 
             $FirstRow = @($ArrayGroup.Group)[0]
@@ -3317,6 +3397,7 @@ function Invalidate-IscsiValidationState {
     }
 
     Write-ToolLog "iSCSI validation invalidated: $Reason." "INFO"
+    Refresh-IscsiPlanTree
     Update-IscsiControls
 }
 
@@ -4015,8 +4096,6 @@ function Invoke-IscsiConnectionPreflight {
 
         }
 
-        Refresh-IscsiPlanTree
-
         $script:IscsiConnectionPlan = @($Plan)
         $script:LastIscsiPreflightTime = Get-Date
         $script:LastIscsiValidationTime = Get-Date
@@ -4036,6 +4115,8 @@ function Invoke-IscsiConnectionPreflight {
                 "Validate / Dry Run complete: $($Plan.Count) mapping(s), $BlockingCount blocked. Resolve blocked rows before Apply."
             Set-GlobalStatus "iSCSI Validate / Dry Run found $BlockingCount blocked mapping(s)."
         }
+
+        Refresh-IscsiPlanTree
 
         Write-ToolLog `
             "ISCSI PLAN COMPLETE mappings=$($Plan.Count) blocked=$BlockingCount." `
