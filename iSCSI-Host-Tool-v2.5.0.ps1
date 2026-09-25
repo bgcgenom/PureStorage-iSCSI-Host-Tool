@@ -8053,7 +8053,7 @@ $Confirm =
 
 function Update-ConflictReviewButtonState {
     if (-not $ReviewConflictButton) { return }
-    $Selected = $PureResultsGrid.SelectedItem
+    $Selected = Get-SelectedPureResult
     $ReviewConflictButton.IsEnabled = [bool](
         $Selected -and ([string]$Selected.Result -like "BLOCKED*")
     )
