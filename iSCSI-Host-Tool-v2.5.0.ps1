@@ -1698,6 +1698,8 @@ Scope:
 - Windows iSCSI / MPIO host preparation
 - Pure host registration
 - optional host-group membership
+- validated Pure iSCSI portal/session configuration
+- post-Apply storage-cache refresh and connectivity verification
 
 Out of scope:
 - Pods
@@ -3323,7 +3325,7 @@ function Refresh-IscsiPlanTree {
         $HostStatusText.Margin = "10,0,0,0"
 
         if ($script:LastIscsiApplyVerificationTime) {
-            $HostStatusText.Text = "✓ Verified"
+            $HostStatusText.Text = "✓ Applied / Verified"
             $HostStatusText.Foreground = "DarkGreen"
             $HostStatusText.FontWeight = "SemiBold"
         }
@@ -3398,7 +3400,7 @@ function Refresh-IscsiPlanTree {
             $ArrayStatusText.Margin = "10,0,0,0"
 
             if ($script:LastIscsiApplyVerificationTime) {
-                $ArrayStatusText.Text = "✓ Verified"
+                $ArrayStatusText.Text = "✓ Applied / Verified"
                 $ArrayStatusText.Foreground = "DarkGreen"
                 $ArrayStatusText.FontWeight = "SemiBold"
             }
@@ -4872,11 +4874,32 @@ function Test-IscsiConnectionPostVerification {
         $script:LastIscsiApplyVerificationTime = Get-Date
         $script:IscsiValidationReason = "VERIFIED"
 
+        foreach ($Row in @($script:IscsiConnectionResults)) {
+            if (-not $Row.Include) {
+                continue
+            }
+
+            $AppliedMatch = @(
+                $script:IscsiConnectionPlan |
+                    Where-Object {
+                        [string]$_.Host -ieq [string]$Row.Host -and
+                        [string]$_.SourceIP -ieq [string]$Row.SourceIP -and
+                        [string]$_.Array -ieq [string]$Row.Array -and
+                        [string]$_.TargetIP -ieq [string]$Row.TargetIP
+                    }
+            ).Count -gt 0
+
+            if ($AppliedMatch) {
+                $Row.Result = "Applied / Verified"
+            }
+        }
+
         $IscsiSummaryText.Text =
             "iSCSI Apply complete - VERIFIED. Portals, active sessions, intended source/target addressing, and available Pure/MPIO runtime data were checked."
 
         Set-GlobalStatus "iSCSI Apply complete - verified."
         Write-ToolLog "ISCSI POST-VERIFY COMPLETE result=PASS." "INFO"
+        Refresh-IscsiPlanTree
         Update-SessionStateBanner
         return $true
     }
