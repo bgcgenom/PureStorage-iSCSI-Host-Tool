@@ -3050,6 +3050,10 @@ function Refresh-IscsiPlanTree {
         $HostItem = New-Object System.Windows.Controls.TreeViewItem
         $HostItem.IsExpanded = $false
         $HostItem.HorizontalContentAlignment = "Stretch"
+        $HostItem.Tag = [pscustomobject]@{
+            NodeType = "Host"
+            Host     = [string]$HostGroup.Name
+        }
 
         $HostHeader = New-Object System.Windows.Controls.StackPanel
         $HostHeader.Orientation = "Horizontal"
@@ -3076,6 +3080,11 @@ function Refresh-IscsiPlanTree {
             $ArrayItem = New-Object System.Windows.Controls.TreeViewItem
             $ArrayItem.IsExpanded = $false
             $ArrayItem.HorizontalContentAlignment = "Stretch"
+            $ArrayItem.Tag = [pscustomobject]@{
+                NodeType = "Array"
+                Host     = [string]$HostGroup.Name
+                Array    = [string]$ArrayGroup.Name
+            }
 
             $ArrayHeader = New-Object System.Windows.Controls.StackPanel
 
@@ -3189,8 +3198,27 @@ function Refresh-IscsiPlanTree {
 
         $IscsiPlanTree.Items.Add($HostItem) | Out-Null
     }
+    Update-IscsiRemoveButtonLabel
 }
 
+function Update-IscsiRemoveButtonLabel {
+    if (-not $IscsiRemoveMappingButton) { return }
+    $IscsiRemoveMappingButton.IsEnabled = $false
+    $IscsiRemoveMappingButton.Content = "Remove Selected"
+    if (-not $IscsiPlanTree -or -not $IscsiPlanTree.SelectedItem) { return }
+    $Tag = $IscsiPlanTree.SelectedItem.Tag
+    if (-not $Tag) { return }
+    if ($Tag.PSObject.Properties["NodeType"]) {
+        switch ([string]$Tag.NodeType) {
+            "Host" { $IscsiRemoveMappingButton.Content = "Remove Host"; $IscsiRemoveMappingButton.IsEnabled = $true; return }
+            "Array" { $IscsiRemoveMappingButton.Content = "Remove Array Paths"; $IscsiRemoveMappingButton.IsEnabled = $true; return }
+        }
+    }
+    if ($Tag.PSObject.Properties["Host"] -and $Tag.PSObject.Properties["TargetIP"]) {
+        $IscsiRemoveMappingButton.Content = "Remove Path"
+        $IscsiRemoveMappingButton.IsEnabled = $true
+    }
+}
 function Get-IscsiSelectedMappings {
     if (-not $script:IscsiConnectionResults) {
         return @()
@@ -8264,26 +8292,42 @@ $IscsiAddMappingButton.Add_Click({
 
 $IscsiRemoveMappingButton.Add_Click({
     $Selected = $IscsiPlanTree.SelectedItem
+    if (-not $Selected -or -not $Selected.Tag) { return }
 
-    if ($Selected -and
-        $Selected.Tag -and
-        $Selected.Tag.PSObject.Properties["Host"]) {
-        $null = $script:IscsiConnectionResults.Remove($Selected.Tag)
-        Refresh-IscsiPlanTree
+    $Tag = $Selected.Tag
+    $RowsToRemove = @()
+    $Prompt = ""
 
-        Invalidate-IscsiValidationState `
-            -Reason "Mapping removed"
+    if ($Tag.PSObject.Properties["NodeType"]) {
+        switch ([string]$Tag.NodeType) {
+            "Host" {
+                $RowsToRemove = @($script:IscsiConnectionResults | Where-Object { [string]$_.Host -ieq [string]$Tag.Host })
+                $Prompt = "Remove host '$($Tag.Host)' and all $($RowsToRemove.Count) iSCSI path mapping(s) from the current plan?`n`nThis changes only the in-memory plan. It does not disconnect or remove live Windows iSCSI sessions."
+            }
+            "Array" {
+                $RowsToRemove = @($script:IscsiConnectionResults | Where-Object { [string]$_.Host -ieq [string]$Tag.Host -and [string]$_.Array -ieq [string]$Tag.Array })
+                $Prompt = "Remove all $($RowsToRemove.Count) '$($Tag.Array)' path mapping(s) from host '$($Tag.Host)' in the current plan?`n`nThis changes only the in-memory plan."
+            }
+        }
     }
-    else {
-        [System.Windows.MessageBox]::Show(
-            "Select an individual path row to remove.",
-            "Remove Mapping",
-            "OK",
-            "Information"
-        ) | Out-Null
+    elseif ($Tag.PSObject.Properties["Host"] -and $Tag.PSObject.Properties["TargetIP"]) {
+        $RowsToRemove = @($Tag)
+        $Prompt = "Remove this iSCSI path from the current plan?`n`nHost: $($Tag.Host)`nArray: $($Tag.Array)`nSource: $($Tag.SourceIP)`nTarget: $($Tag.TargetIP)"
     }
+
+    if ($RowsToRemove.Count -eq 0) { return }
+
+    $Confirm = [System.Windows.MessageBox]::Show($Prompt,"Remove from iSCSI Plan","YesNo","Question")
+    if ($Confirm -ne "Yes") { return }
+
+    foreach ($Row in $RowsToRemove) { $null = $script:IscsiConnectionResults.Remove($Row) }
+    Refresh-IscsiPlanTree
+    Invalidate-IscsiValidationState -Reason "iSCSI plan mappings removed"
 })
 
+if ($IscsiPlanTree) {
+    $IscsiPlanTree.Add_SelectedItemChanged({ Update-IscsiRemoveButtonLabel })
+}
 $IscsiBuildPlanButton.Add_Click({
     Build-IscsiRecommendedPlan
 })
@@ -9491,5 +9535,6 @@ if ($HelpButton) {
 
 Refresh-IscsiSmartChoices
 Refresh-IscsiPlanTree
+Update-IscsiRemoveButtonLabel
 Update-IscsiControls
 $null = $Window.ShowDialog()
