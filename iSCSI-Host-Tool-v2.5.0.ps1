@@ -7798,7 +7798,18 @@ if ($IscsiMinimumPathsTextBox) {
 
 if ($MainTabs) {
     $MainTabs.Add_SelectionChanged({
+        param($Sender,$EventArgs)
+
         try {
+            # SelectionChanged is a routed WPF event. ComboBox/DataGrid selection
+            # changes inside a tab bubble up to the TabControl. Only refresh when
+            # the TabControl itself changed tabs; otherwise smart dropdown refreshes
+            # can recursively trigger more discovery.
+            if ($EventArgs -and
+                $EventArgs.OriginalSource -ne $MainTabs) {
+                return
+            }
+
             $SelectedTab = $MainTabs.SelectedItem
 
             if ($SelectedTab -and
