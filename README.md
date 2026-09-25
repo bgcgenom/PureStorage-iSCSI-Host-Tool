@@ -32,7 +32,7 @@ The tool provides a guided workflow for preparing Windows Server hosts, validati
 - Validates the Microsoft iSCSI Initiator service.
 - Validates/installs Multipath-IO (MPIO).
 - Registers `PURE / FlashArray` with Microsoft DSM.
-- Sets the host-level default load-balance policy to Round Robin.
+- Sets the Microsoft DSM global/default MPIO policy to Round Robin.
 - Applies Pure-recommended global MPIO timers.
 - Sets the Windows power plan to High Performance.
 - Tracks whether a reboot is required.
@@ -161,7 +161,7 @@ The current host-level Pure baseline includes:
 | Microsoft iSCSI Initiator | Automatic / Running |
 | Multipath-IO | Installed |
 | Microsoft DSM | `PURE / FlashArray` registered |
-| Global default load-balance policy | Round Robin |
+| Global/default MPIO policy | Round Robin |
 | NewPathRecoveryInterval | 20 |
 | CustomPathRecovery | Enabled |
 | NewPDORemovePeriod | 30 |
@@ -169,7 +169,16 @@ The current host-level Pure baseline includes:
 | NewPathVerificationState | Enabled |
 | Windows power plan | High Performance |
 
-The global Round Robin setting is a **host-level/default policy**. Existing Pure devices may retain a different per-device policy. Per-device MPIO validation is intentionally treated separately from host-level defaults.
+The Round Robin setting above is the **Microsoft DSM global/default MPIO policy**, obtained with `Get-MSDSMGlobalDefaultLoadBalancePolicy` and configured with `Set-MSDSMGlobalDefaultLoadBalancePolicy -Policy RR`.
+
+This value does **not** prove the effective policy of an already-presented Pure MPIO device. Device-level policy is a separate runtime value and may differ based on Windows MPIO/ALUA behavior.
+
+Example observed during live validation:
+
+- Global/default MPIO policy: `RR`
+- Observed Pure device policy: `RRWS` (Round Robin with Subset)
+
+The tool does not treat the observed RRWS value as an instruction to change the device and does not silently apply per-device MPIO policy changes.
 
 ## Validation states
 
@@ -216,8 +225,10 @@ Additional documentation is maintained under `Docs/`:
 
 ```text
 PureStorage-iSCSI-Host-Tool/
+├── iSCSI-Host-Tool-v2.5.1.ps1
 ├── iSCSI-Host-Tool-v2.5.0.ps1
-├── iSCSI-Host-Tool-v2.4.19.ps1
+├── Archive/
+│   └── iSCSI-Host-Tool-v2.4.19.ps1
 ├── README.md
 ├── LICENSE
 ├── .gitignore
