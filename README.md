@@ -2,7 +2,7 @@
 
 PowerShell/WPF utility for validating and configuring Windows Server hosts for Pure Storage iSCSI connectivity, MPIO readiness, host registration, and host-group workflows.
 
-> **Project status:** Current release candidate: **v2.5.0**
+> **Project status:** Current completed release: **v2.5.0**
 >
 > This is an independent community project and is not an official Pure Storage product.
 
