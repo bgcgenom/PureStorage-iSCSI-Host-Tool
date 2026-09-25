@@ -8096,6 +8096,13 @@ $IscsiExportButton.Add_Click({
     Export-IscsiConnectionResults
 })
 
+if ($IscsiMappingGrid) {
+    $IscsiMappingGrid.Add_CellEditEnding({
+        Invalidate-IscsiValidationState `
+            -Reason "Mapping plan edited"
+    })
+}
+
 if ($IscsiPersistentCheckBox) {
     $IscsiPersistentCheckBox.Add_Click({
         Invalidate-IscsiValidationState `
