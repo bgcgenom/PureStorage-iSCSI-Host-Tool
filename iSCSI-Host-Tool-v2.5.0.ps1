@@ -3038,6 +3038,46 @@ function Refresh-IscsiPlanTree {
         return
     }
 
+    # Preserve the user's place when the tree is rebuilt after edits,
+    # validation, removal, or plan refresh.
+    $ExpandedHosts = @{}
+    $ExpandedArrays = @{}
+
+    foreach ($ExistingHostItem in @($IscsiPlanTree.Items)) {
+        if (-not $ExistingHostItem -or -not $ExistingHostItem.Tag) {
+            continue
+        }
+
+        $ExistingHostTag = $ExistingHostItem.Tag
+
+        if ($ExistingHostTag.PSObject.Properties["NodeType"] -and
+            [string]$ExistingHostTag.NodeType -eq "Host") {
+            $HostKey = ([string]$ExistingHostTag.Host).ToLowerInvariant()
+
+            if ($ExistingHostItem.IsExpanded) {
+                $ExpandedHosts[$HostKey] = $true
+            }
+
+            foreach ($ExistingArrayItem in @($ExistingHostItem.Items)) {
+                if (-not $ExistingArrayItem -or -not $ExistingArrayItem.Tag) {
+                    continue
+                }
+
+                $ExistingArrayTag = $ExistingArrayItem.Tag
+
+                if ($ExistingArrayTag.PSObject.Properties["NodeType"] -and
+                    [string]$ExistingArrayTag.NodeType -eq "Array" -and
+                    $ExistingArrayItem.IsExpanded) {
+                    $ArrayKey = "{0}|{1}" -f
+                        ([string]$ExistingArrayTag.Host).ToLowerInvariant(),
+                        ([string]$ExistingArrayTag.Array).ToLowerInvariant()
+
+                    $ExpandedArrays[$ArrayKey] = $true
+                }
+            }
+        }
+    }
+
     $IscsiPlanTree.Items.Clear()
 
     $HostGroups = @(
@@ -3048,7 +3088,8 @@ function Refresh-IscsiPlanTree {
 
     foreach ($HostGroup in $HostGroups) {
         $HostItem = New-Object System.Windows.Controls.TreeViewItem
-        $HostItem.IsExpanded = $false
+        $HostKey = ([string]$HostGroup.Name).ToLowerInvariant()
+        $HostItem.IsExpanded = $ExpandedHosts.ContainsKey($HostKey)
         $HostItem.HorizontalContentAlignment = "Stretch"
         $HostItem.Tag = [pscustomobject]@{
             NodeType = "Host"
@@ -3078,7 +3119,10 @@ function Refresh-IscsiPlanTree {
                 Sort-Object Name
         )) {
             $ArrayItem = New-Object System.Windows.Controls.TreeViewItem
-            $ArrayItem.IsExpanded = $false
+            $ArrayKey = "{0}|{1}" -f
+                ([string]$HostGroup.Name).ToLowerInvariant(),
+                ([string]$ArrayGroup.Name).ToLowerInvariant()
+            $ArrayItem.IsExpanded = $ExpandedArrays.ContainsKey($ArrayKey)
             $ArrayItem.HorizontalContentAlignment = "Stretch"
             $ArrayItem.Tag = [pscustomobject]@{
                 NodeType = "Array"
