@@ -680,8 +680,9 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                               CanUserAddRows="False"
                               SelectionMode="Single"
                               FrozenColumnCount="1"
-                              HorizontalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Visible"
                               VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.CanContentScroll="True"
                               Margin="0,0,0,8">
                         <DataGrid.Columns>
                             <DataGridCheckBoxColumn Header="Use" Binding="{Binding Include}" Width="45" IsReadOnly="False"/>
@@ -694,7 +695,7 @@ Write-ToolLog "iSCSI Host Tool v$($script:ToolVersion) started by $env:USERDOMAI
                             <DataGridTextColumn Header="Portal" Binding="{Binding PortalState}" Width="90" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Session" Binding="{Binding SessionState}" Width="90" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="185" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="420" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
 
@@ -3931,13 +3932,124 @@ function Get-IscsiChangePreview {
     $Lines -join [Environment]::NewLine
 }
 
+function Show-IscsiScrollableTextDialog {
+    param(
+        [string]$Title,
+        [string]$Text,
+        [switch]$Confirm
+    )
+
+    $Dialog = New-Object System.Windows.Window
+    $Dialog.Title = $Title
+    $Dialog.WindowStartupLocation = "CenterOwner"
+    $Dialog.ResizeMode = "CanResize"
+    $Dialog.MinWidth = 760
+    $Dialog.MinHeight = 500
+
+    $WorkArea = [System.Windows.SystemParameters]::WorkArea
+    $Dialog.Width = [math]::Min(1100,[math]::Max(760,$WorkArea.Width * 0.82))
+    $Dialog.Height = [math]::Min(820,[math]::Max(500,$WorkArea.Height * 0.82))
+
+    if ($Window) {
+        $Dialog.Owner = $Window
+    }
+
+    $Root = New-Object System.Windows.Controls.Grid
+    $Root.Margin = "12"
+
+    $Row1 = New-Object System.Windows.Controls.RowDefinition
+    $Row1.Height = New-Object System.Windows.GridLength(1,[System.Windows.GridUnitType]::Star)
+    $Row2 = New-Object System.Windows.Controls.RowDefinition
+    $Row2.Height = [System.Windows.GridLength]::Auto
+    $Root.RowDefinitions.Add($Row1)
+    $Root.RowDefinitions.Add($Row2)
+
+    $TextBox = New-Object System.Windows.Controls.TextBox
+    $TextBox.Text = $Text
+    $TextBox.IsReadOnly = $true
+    $TextBox.AcceptsReturn = $true
+    $TextBox.AcceptsTab = $true
+    $TextBox.TextWrapping = "NoWrap"
+    $TextBox.FontFamily = "Consolas"
+    $TextBox.FontSize = 12
+    $TextBox.VerticalScrollBarVisibility = "Auto"
+    $TextBox.HorizontalScrollBarVisibility = "Auto"
+    $TextBox.Padding = "8"
+    [System.Windows.Controls.Grid]::SetRow($TextBox,0)
+    $Root.Children.Add($TextBox) | Out-Null
+
+    $Buttons = New-Object System.Windows.Controls.StackPanel
+    $Buttons.Orientation = "Horizontal"
+    $Buttons.HorizontalAlignment = "Right"
+    $Buttons.Margin = "0,10,0,0"
+    [System.Windows.Controls.Grid]::SetRow($Buttons,1)
+
+    $CopyButton = New-Object System.Windows.Controls.Button
+    $CopyButton.Content = "Copy"
+    $CopyButton.Width = 90
+    $CopyButton.Height = 30
+    $CopyButton.Margin = "0,0,8,0"
+    $CopyButton.Add_Click({
+        try {
+            [System.Windows.Clipboard]::SetText($TextBox.Text)
+        }
+        catch {}
+    })
+    $Buttons.Children.Add($CopyButton) | Out-Null
+
+    if ($Confirm) {
+        $ApplyButton = New-Object System.Windows.Controls.Button
+        $ApplyButton.Content = "Apply"
+        $ApplyButton.Width = 90
+        $ApplyButton.Height = 30
+        $ApplyButton.Margin = "0,0,8,0"
+        $ApplyButton.IsDefault = $true
+        $ApplyButton.Add_Click({
+            $Dialog.Tag = $true
+            $Dialog.DialogResult = $true
+        })
+        $Buttons.Children.Add($ApplyButton) | Out-Null
+
+        $CancelButton = New-Object System.Windows.Controls.Button
+        $CancelButton.Content = "Cancel"
+        $CancelButton.Width = 90
+        $CancelButton.Height = 30
+        $CancelButton.IsCancel = $true
+        $CancelButton.Add_Click({
+            $Dialog.Tag = $false
+            $Dialog.DialogResult = $false
+        })
+        $Buttons.Children.Add($CancelButton) | Out-Null
+    }
+    else {
+        $CloseButton = New-Object System.Windows.Controls.Button
+        $CloseButton.Content = "Close"
+        $CloseButton.Width = 90
+        $CloseButton.Height = 30
+        $CloseButton.IsDefault = $true
+        $CloseButton.IsCancel = $true
+        $CloseButton.Add_Click({
+            $Dialog.Close()
+        })
+        $Buttons.Children.Add($CloseButton) | Out-Null
+    }
+
+    $Root.Children.Add($Buttons) | Out-Null
+    $Dialog.Content = $Root
+
+    if ($Confirm) {
+        $Dialog.Tag = $false
+        $null = $Dialog.ShowDialog()
+        return [bool]$Dialog.Tag
+    }
+
+    $null = $Dialog.ShowDialog()
+}
+
 function Show-IscsiChangePreview {
-    [System.Windows.MessageBox]::Show(
-        (Get-IscsiChangePreview),
-        "iSCSI Connection Change Preview",
-        "OK",
-        "Information"
-    ) | Out-Null
+    Show-IscsiScrollableTextDialog `
+        -Title "iSCSI Connection Change Preview" `
+        -Text (Get-IscsiChangePreview)
 }
 
 function Get-IscsiPostVerifyInventory {
@@ -4352,18 +4464,16 @@ function Apply-IscsiConnections {
         "It will NOT create or map Pure volumes, initialize or format disks, change MPIO policy, modify preferred-array settings, create CSVs, or modify Failover Cluster configuration."
     )
 
-    $Confirmation = [System.Windows.MessageBox]::Show(
-        $ConfirmText,
-        "Apply iSCSI Connections",
-        "YesNo",
-        "Warning"
-    )
+    $Confirmed = Show-IscsiScrollableTextDialog `
+        -Title "Apply iSCSI Connections" `
+        -Text $ConfirmText `
+        -Confirm
 
     Write-ToolLog `
-        "ISCSI APPLY confirmation returned: $Confirmation." `
+        "ISCSI APPLY confirmation returned: $Confirmed." `
         "INFO"
 
-    if ($Confirmation -ne "Yes") {
+    if (-not $Confirmed) {
         Set-GlobalStatus "iSCSI Apply cancelled."
         return
     }
