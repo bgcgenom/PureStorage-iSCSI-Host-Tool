@@ -2,7 +2,7 @@
 
 PowerShell/WPF utility for validating and configuring Windows Server hosts for Pure Storage iSCSI connectivity, MPIO readiness, host registration, and host-group workflows.
 
-> **Project status:** Current completed release: **v2.4.19**
+> **Project status:** Current release candidate: **v2.5.0**
 >
 > This is an independent community project and is not an official Pure Storage product.
 
@@ -23,7 +23,7 @@ PowerShell/WPF utility for validating and configuring Windows Server hosts for P
 
 ## What it does
 
-The tool provides a guided workflow for preparing Windows Server hosts and validating Pure Storage host registration before changes are applied.
+The tool provides a guided workflow for preparing Windows Server hosts, validating Pure Storage host registration, building a recommended Pure iSCSI connection plan, and safely applying verified iSCSI portal/session configuration.
 
 ### Windows host readiness
 
@@ -54,6 +54,20 @@ The tool provides a guided workflow for preparing Windows Server hosts and valid
 - Provides Change Preview and confirmation before Pure-side writes.
 - Preserves post-Apply verification and logging workflows.
 
+### iSCSI connections
+
+- Builds a recommended host-to-array iSCSI topology from audited Windows hosts and connected Pure arrays.
+- Discovers Pure iSCSI target ports/IPs and target IQNs from connected arrays.
+- Uses same-subnet matching between host source IPs and Pure target IPs.
+- Supports manual mapping for exceptions and non-standard topologies.
+- Creates or reuses Windows iSCSI target portals.
+- Establishes persistent, multipath iSCSI sessions.
+- Validates source IP, target IP, TCP/3260 reachability, portal state, and session state before Apply.
+- Treats existing correct configuration as `MATCH`.
+- Refreshes the Windows storage cache with `Update-HostStorageCache` after a successful Apply.
+- Performs post-Apply verification and marks verified hosts, arrays, and enabled paths as Applied / Verified.
+- Detects visible Pure disks when present without requiring LUN presentation to complete the iSCSI workflow.
+
 ### Operational features
 
 - Connectivity preflight checks.
@@ -80,7 +94,9 @@ Depending on the selected workflow and operator confirmation, the tool may modif
 - Windows power-plan configuration;
 - Pure Storage host objects;
 - host IQN assignments;
-- Pure Storage host-group membership.
+- Pure Storage host-group membership;
+- explicitly approved Windows iSCSI target portals and persistent/multipath sessions;
+- Windows host storage-cache refresh after successful iSCSI Apply.
 
 Array-side changes are not performed silently. Review the Dry Run, Change Preview, and confirmation prompts before Apply.
 
@@ -94,7 +110,7 @@ The tool **does not**:
 - create or modify Pods;
 - create or modify Protection Groups;
 - build a Windows Failover Cluster;
-- silently add or remove storage paths;
+- create storage paths outside the validated iSCSI connection plan;
 - silently overwrite conflicting Pure host objects.
 
 These operations remain outside the tool by design.
@@ -128,7 +144,13 @@ The tool checks prerequisites and requests approval before installing missing su
 12. Resolve any blocked/conflicting rows.
 13. Review **Change Preview**.
 14. Run **Apply Pure Registration** only when the validated plan is correct.
-15. Review the log and post-Apply verification.
+15. Open **iSCSI Connections**.
+16. Select **Build Recommended Plan** or add manual mappings for exceptions.
+17. Run **Validate / Dry Run** and resolve any blocked paths.
+18. Review **Show Change Preview**.
+19. Run **Apply iSCSI Connections**.
+20. Confirm the hosts/arrays show **Applied / Verified** and the enabled paths show **Applied / Verified**.
+21. Review the log and export results as required.
 
 ## Windows baseline
 
@@ -194,13 +216,10 @@ Additional documentation is maintained under `Docs/`:
 
 ```text
 PureStorage-iSCSI-Host-Tool/
+├── iSCSI-Host-Tool-v2.5.0.ps1
 ├── iSCSI-Host-Tool-v2.4.19.ps1
 ├── README.md
 ├── LICENSE
 ├── .gitignore
 └── Docs/
-    ├── USER-GUIDE.html
-    ├── OPERATIONS-GUIDE.md
-    ├── TROUBLESHOOTING.md
-    ├── SECURITY-SCOPE.md
-    └── CHANGE-CHECKLIST.md
+    └── USER-GUIDE.html
